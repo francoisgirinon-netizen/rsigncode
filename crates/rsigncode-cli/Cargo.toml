@@ -12,9 +12,14 @@ repository.workspace = true
 name = "rsigncode"
 path = "src/main.rs"
 
+[features]
+default = ["aws-lc"]
+aws-lc = ["rsigncode/aws-lc"]
+pure-rust = ["rsigncode/pure-rust"]
+
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-rsigncode = { path = "../rsigncode" }
+rsigncode = { path = "../rsigncode", default-features = false }
 
 [lints]
 workspace = true

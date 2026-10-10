@@ -8,10 +8,18 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[features]
+default = ["aws-lc"]
+# Hashing backend: aws-lc-rs (assembly, faster than RustCrypto on CPUs without the SHA
+# extensions; needs a C compiler to build) ...
+aws-lc = ["dep:aws-lc-rs"]
+# ... or pure Rust (RustCrypto sha1 and sha2). Used when `aws-lc` is disabled.
+pure-rust = ["dep:sha1", "dep:sha2"]
+
 [dependencies]
-digest = "0.11.3"
-sha1 = "0.11.0"
-sha2 = "0.11.0"
+aws-lc-rs = { version = "1.18", optional = true }
+sha1 = { version = "0.11.0", optional = true }
+sha2 = { version = "0.11.0", optional = true }
 
 [dev-dependencies]
 memmap2 = "0.9.11"
