@@ -33,6 +33,34 @@ implementations for key files, PKCS#11 and, later, cloud services.
 PE files can be close to 4 GB. Files are read through a memory map and hashed in one
 pass. The patch mode of `attach-signature` writes only the bytes that change.
 
+## Hashing backend
+
+Hashing goes through `rsigncode::hash` (`Hasher::new(HashAlgorithm)`, `update`, `finalize`;
+`Send`). Cargo features of `rsigncode` (forwarded by `rsigncode-cli`):
+
+- `aws-lc` (default): `aws-lc-rs`, digest module (`SHA1_FOR_LEGACY_USE_ONLY`, `SHA256`,
+  `SHA384`, `SHA512`). It needs a C compiler to build (and NASM on Windows, installed in CI
+  with `ilammy/setup-nasm`).
+- `pure-rust`: RustCrypto `sha1` and `sha2`, no C code. Used when `aws-lc` is disabled; if
+  both are enabled `aws-lc` wins; if neither, `compile_error!`.
+
+Measured on a Xeon E5-1620 v3 (no SHA-NI), MB/s on large buffers:
+
+| | SHA-1 | SHA-256 | SHA-512 |
+|---|---|---|---|
+| RustCrypto `sha1`/`sha2` 0.11 | 537 | 204 | 373 |
+| `aws-lc-rs` | 945 | 365 | 528 |
+| OpenSSL (`openssl speed`) | - | 423 | - |
+
+Why `aws-lc-rs` by default: signing is dominated by hashing multi-GB files, and on CPUs
+without the SHA extensions it is 1.4 to 1.8 times faster than RustCrypto, close to
+OpenSSL. Why not `ring`: its SHA-1 is slow (SHA-1 is still needed for dual signing). Why
+not pure Rust by default: the portable SHA-256 is the slowest option, and the only fast
+path in RustCrypto is the SHA-NI one
+([RustCrypto/hashes#327](https://github.com/RustCrypto/hashes/issues/327) tracks the
+missing assembly or AVX2 implementations). The `pure-rust` feature remains for platforms
+without a C toolchain and is tested in CI.
+
 ## Performance
 
 Method: generate a sparse PE of about 2 GB with `cargo run --release --example fixtures --

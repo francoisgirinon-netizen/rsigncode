@@ -71,6 +71,13 @@ Test names are in `crates/rsigncode/tests/`: `pe_digest.rs` (D), `pe_parser.rs` 
 | ROBUST-1 | Never panic or index out of bounds on hostile input | project rule | D `random_corruption_never_panics`, D `every_truncation_inside_the_headers_or_sections_is_an_error` | covered |
 | ROBUST-2 | Malformed input is reported as an `Error` (truncation at any byte, bad signatures, sections or certificate table outside the file, missing directory) | project rule | D `every_truncation_inside_the_headers_or_sections_is_an_error`, D `bad_signatures_and_magic_are_reported`, D `section_beyond_the_end_of_the_file_is_an_error`, D `certificate_table_outside_the_file_is_an_error`, D `fewer_than_five_data_directories_is_an_error`, C `checksum_of_malformed_file_is_an_error` | covered |
 
+## Hash backend
+
+| ID | Requirement | Source | Tests | Status |
+|---|---|---|---|---|
+| HASH-1 | SHA-1, SHA-256, SHA-384 and SHA-512 give the NIST FIPS 180-4 values ("abc", empty message, 448-bit message) whatever the backend (`aws-lc` or `pure-rust`) | NIST FIPS 180-4 examples, `openssl dgst` | `hash.rs` `nist_fips_180_vectors` | covered |
+| HASH-2 | A hasher is `Send` (can move to a worker thread) | project rule | `hash.rs` `hasher_is_send` | covered |
+
 ## Summary
 
 | | covered | not covered | out of scope |
