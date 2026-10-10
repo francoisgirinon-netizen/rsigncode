@@ -9,6 +9,8 @@ fn data(name: &str) -> Vec<u8> {
 
 // Oracle: `osslsigncode verify -in <file>` prints "PE checksum", the value it stored when
 // signing (SignTool for tiny64.signed.efi).
+/// Spec: PECOFF-9 (algorithm), PECOFF-3 (CheckSum field treated as zero), PECOFF-1/2 (PE32
+/// and PE32+ files).
 #[test]
 fn checksum_of_signed_files_matches_the_tools() {
     assert_eq!(checksum(&data("pe32_extra_3.signed.exe")), Ok(0xAD78));
@@ -18,6 +20,7 @@ fn checksum_of_signed_files_matches_the_tools() {
 
 // Oracle: `osslsigncode remove-signature` on pe32_extra_3.signed.exe recomputes the checksum
 // of the unsigned (padded) file and writes it in the header.
+/// Spec: PECOFF-9.
 #[test]
 fn checksum_of_unsigned_file_matches_osslsigncode() {
     assert_eq!(
@@ -26,6 +29,7 @@ fn checksum_of_unsigned_file_matches_osslsigncode() {
     );
 }
 
+/// Spec: PECOFF-3, PECOFF-9.
 #[test]
 fn checksum_ignores_the_checksum_field() {
     let a = PeBuilder::new(false).build();
@@ -37,6 +41,7 @@ fn checksum_ignores_the_checksum_field() {
 
 // Hand computation: all the words are summed, so changing one byte of an unaligned file
 // changes the result by the expected amount.
+/// Spec: PECOFF-9 (a trailing odd byte is a word of its own).
 #[test]
 fn checksum_of_odd_length_file_counts_the_last_byte_as_low_byte() {
     let a = fixtures()
@@ -52,6 +57,7 @@ fn checksum_of_odd_length_file_counts_the_last_byte_as_low_byte() {
     assert_eq!(ca.abs_diff(cb), 1);
 }
 
+/// Spec: ROBUST-2.
 #[test]
 fn checksum_of_malformed_file_is_an_error() {
     assert_eq!(checksum(&[]), Err(Error::Truncated));
