@@ -79,7 +79,7 @@ foreach ($f in (Get-ChildItem $Fixtures -File | Sort-Object Name)) {
     $ok = [ImageHlp]::CheckSumBuffer([IO.File]::ReadAllBytes($f.FullName), [ref]$hs, [ref]$cs)
     $entry.checksum_mapped_file = [ordered]@{ found_headers = $ok; header_sum = $hs; checksum = $cs }
 
-    foreach ($alg in 'sha1', 'sha256') {
+    foreach ($alg in 'sha1', 'sha256', 'sha384', 'sha512') {
         $dgDir = Join-Path $Out "dg/$alg"
         $signedDir = Join-Path $Out "signed/$alg"
         New-Item -ItemType Directory -Force $dgDir, $signedDir | Out-Null

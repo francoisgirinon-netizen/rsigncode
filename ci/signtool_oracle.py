@@ -30,7 +30,11 @@ OID_PAGE_HASH = {
 OID_DIGEST = {
     bytes.fromhex("2b0e03021a"): "sha1",
     bytes.fromhex("608648016503040201"): "sha256",
+    bytes.fromhex("608648016503040202"): "sha384",
+    bytes.fromhex("608648016503040203"): "sha512",
 }
+ALGORITHMS = ("sha1", "sha256", "sha384", "sha512")
+PAGE_HASH_ALGORITHMS = ("sha1", "sha256")  # the only page hash attribute OIDs
 
 
 # ---------------------------------------------------------------------------- DER
@@ -179,7 +183,7 @@ def extract(directory, out_path):
             "map_file_and_checksum": f["map_file_and_checksum"],
             "checksum_mapped_file": f["checksum_mapped_file"],
         }
-        for alg in ("sha1", "sha256"):
+        for alg in ALGORITHMS:
             r = f[alg]
             dg = {"exit": r["dg"]["exit"], "output": r["dg"]["output"], "digest": None}
             p7u = directory / r["p7u"]
@@ -231,7 +235,9 @@ def short(value):
 
 
 def one_line(text):
-    return " ".join((text or "").split()).replace("|", "/")
+    """The SignTool error lines of `text` on one line (paths and progress left out)."""
+    errors = [l for l in (text or "").splitlines() if "Error" in l and "Number of errors" not in l]
+    return " ".join(" ".join(errors or [text or ""]).split()).replace("|", "/")
 
 
 def compare(oracle_path, rsigncode_path, committed_path, strict, signed_paths):
@@ -253,10 +259,10 @@ def compare(oracle_path, rsigncode_path, committed_path, strict, signed_paths):
         "Legend: `ok` same value; `MISMATCH`; `both refuse`; `ST refuses`: SignTool refuses and "
         "rsigncode computes a value; `RS refuses`: SignTool accepts and rsigncode refuses.",
         "",
-        "| fixture | size | SHA-1 digest | SHA-256 digest | SHA-1 pages | SHA-256 pages | "
-        "pages by offset | checksum (MapFileAndCheckSum) | checksum (CheckSumMappedFile) | "
-        "rsigncode on the file signed by SignTool (CheckSum field, digest) |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "| fixture | size | SHA-1 digest | SHA-256 digest | SHA-384 digest | SHA-512 digest | "
+        "SHA-1 pages | SHA-256 pages | pages by offset | checksum (MapFileAndCheckSum) | "
+        "checksum (CheckSumMappedFile) | rsigncode on the file signed by SignTool (CheckSum field, digest) |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     refusals = []
     for name, st in oracle["files"].items():
@@ -282,7 +288,7 @@ def compare(oracle_path, rsigncode_path, committed_path, strict, signed_paths):
                 return "MISMATCH"
             return "ok"
 
-        for alg in ("sha1", "sha256"):
+        for alg in ALGORITHMS:
             dg = st[alg]["dg"]
             cells.append(
                 verdict(f"{alg} digest", dg["digest"], rs[alg]["digest"], rs[alg]["digest_error"], dg["output"])
@@ -290,7 +296,7 @@ def compare(oracle_path, rsigncode_path, committed_path, strict, signed_paths):
             sign = st[alg]["sign"]
             if sign["digest"] and dg["digest"] and sign["digest"] != dg["digest"]:
                 failures.append(f"{name} {alg}: digest of /dg and of the signed copy differ")
-        for alg in ("sha1", "sha256"):
+        for alg in PAGE_HASH_ALGORITHMS:
             sign = st[alg]["sign"]
             cells.append(
                 verdict(
@@ -337,7 +343,7 @@ def compare(oracle_path, rsigncode_path, committed_path, strict, signed_paths):
                 for key in ("map_file_and_checksum", "checksum_mapped_file", "sha256_of_file"):
                     if old.get(key) != st.get(key):
                         drift.append(f"{name} {key}")
-                for alg in ("sha1", "sha256"):
+                for alg in ALGORITHMS:
                     for part, fields in (("dg", ("digest",)), ("sign", ("digest", "page_hashes", "checksum_field"))):
                         for field in fields:
                             if old[alg][part].get(field) != st[alg][part].get(field):
