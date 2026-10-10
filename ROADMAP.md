@@ -10,7 +10,8 @@ Status: `[ ]` todo, `[~]` in progress, `[x]` done.
 - [x] PE/PE32+ parsing (headers, sections, certificate table), checksum
 - [x] Authenticode digest (SHA-1, SHA-256, SHA-384, SHA-512), with the 8-byte padding of
       unsigned files that SignTool uses
-- [ ] Page hashes (`-ph`), SHA-1 and SHA-256
+- [x] Page hashes (`-ph`), SHA-1 and SHA-256, computed with the digest in one
+      multi-threaded pass
 - [ ] `SpcIndirectDataContent`, `SpcPeImageData`, `SpcSpOpusInfo` (`-n`, `-i`),
       statement type (`-comm`)
 - [ ] CMS `SignedData` with RSA (PKCS#1 v1.5) and ECDSA keys
