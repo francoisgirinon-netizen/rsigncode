@@ -1,7 +1,7 @@
 # Specification coverage
 
 Each requirement has a stable ID. Tests name the IDs they check in a `/// Spec:` doc
-comment, so `grep -rn "AUTH-PE-7" crates/` finds them. Scope: the `pe` module (parsing,
+comment, so `grep -rn "AUTH-PE-7" crates/` finds them. Scope: the `hash` and `pe` modules (hashing backend, parsing, page hashes, single pass,
 Authenticode digest, checksum). Status: covered, not covered (with the reason), out of
 scope for this branch.
 
@@ -116,5 +116,8 @@ against real SignTool**, so the behaviours marked "quirk" (OSSL-PH-5) may differ
 | AUTH-PE-14b | 0 | 1 | 0 |
 | PECOFF-1..11 | 9 | 1 (PECOFF-10) | 1 (PECOFF-11) |
 | SIGNTOOL-1..2 | 2 | 0 | 0 |
-| ROBUST-1..2 | 2 | 0 | 0 |
-| **Total (31)** | **28** | **2** | **1** |
+| ROBUST-1..3 | 3 | 0 | 0 |
+| OSSL-PH-1..9 | 8 | 1 (OSSL-PH-8) | 0 |
+| PAR-1..4 | 4 | 0 | 0 |
+| HASH-1..2 | 2 | 0 | 0 |
+| **Total (47)** | **43** | **3** | **1** |
