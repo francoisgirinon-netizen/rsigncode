@@ -92,6 +92,15 @@ against real SignTool**, so the behaviours marked "quirk" (OSSL-PH-5) may differ
 | OSSL-PH-8 | A signed input file: page hashes of a file that already carries a certificate table | not observed | none | not covered: osslsigncode signs a clean file; by construction the certificate table is outside every section |
 | OSSL-PH-9 | The oracle refuses `SectionAlignment` = 0 ("Corrupted page size"), `SizeOfHeaders` > `SectionAlignment` ("Page size is smaller than header size") and a file with no section; we return `InvalidPageSize` / `NoSections` | osslsigncode `-ph` | PH `files_that_osslsigncode_refuses_are_an_error` | covered |
 
+## Single pass (project requirements)
+
+| ID | Requirement | Source | Tests | Status |
+|---|---|---|---|---|
+| PAR-1 | `pe::digests` gives, byte for byte, the results of `authenticode_digest` and `page_hashes` (multi-page, empty and reversed sections, real images, 1.2 MiB with 300 pages split between threads) | project rule; the sequential functions are checked against the oracles | `pe_digests.rs` `single_pass_equals_the_sequential_functions*` | covered |
+| PAR-2 | File digests come back in the order of the requested algorithms (SHA-1 + SHA-256 dual signing, all four) | project rule | `pe_digests.rs` `single_pass_equals_the_sequential_functions` | covered |
+| PAR-3 | File digests and page hashes are both optional | project rule | `pe_digests.rs` `page_hashes_and_file_digests_are_optional` | covered |
+| PAR-4 | Same errors as the sequential functions (page hash errors only when page hashes are requested) | project rule | `pe_digests.rs` `errors_are_reported_like_the_sequential_functions` | covered |
+
 ## Hash backend
 
 | ID | Requirement | Source | Tests | Status |
