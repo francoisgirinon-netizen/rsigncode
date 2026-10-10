@@ -70,6 +70,27 @@ Test names are in `crates/rsigncode/tests/`: `pe_digest.rs` (D), `pe_parser.rs` 
 |---|---|---|---|---|
 | ROBUST-1 | Never panic or index out of bounds on hostile input | project rule | D `random_corruption_never_panics`, D `every_truncation_inside_the_headers_or_sections_is_an_error` | covered |
 | ROBUST-2 | Malformed input is reported as an `Error` (truncation at any byte, bad signatures, sections or certificate table outside the file, missing directory) | project rule | D `every_truncation_inside_the_headers_or_sections_is_an_error`, D `bad_signatures_and_magic_are_reported`, D `section_beyond_the_end_of_the_file_is_an_error`, D `certificate_table_outside_the_file_is_an_error`, D `fewer_than_five_data_directories_is_an_error`, C `checksum_of_malformed_file_is_an_error` | covered |
+| ROBUST-3 | Never allocate or loop from header values: bounds of every section are checked before the table is sized; the table is bounded by the file (sum of section sizes <= file size, `SectionAlignment` <= 1 MiB, page >= headers). osslsigncode had a bug of that kind | project rule | PH `section_bounds_outside_the_file_are_an_error`, PH `table_size_is_bounded_by_the_file`, PH `hostile_alignment_and_overlapping_sections_are_an_error` | covered |
+
+## Page hashes (observed on osslsigncode, not in the specification)
+
+The Authenticode document only names the page hash attribute (`SpcPeImageData`); the table
+layout below was determined from the tables osslsigncode embeds when signing with `-ph`
+(built from the local checkout, `tests/data/page_hashes.sh`), 17 fixtures x SHA-1 and
+SHA-256. Data: `tests/data/page_hashes.txt`. Tests: `pe_page_hashes.rs` (PH). **Not verified
+against real SignTool**, so the behaviours marked "quirk" (OSSL-PH-5) may differ from SignTool.
+
+| ID | Requirement | Source | Tests | Status |
+|---|---|---|---|---|
+| OSSL-PH-1 | The table is a sequence of entries (u32 LE file offset, digest): 24 bytes for SHA-1, 36 for SHA-256 (4 + digest length for any algorithm); last entry: offset of the end of the last section, zero digest | osslsigncode `-ph` | PH `page_hash_tables_match_osslsigncode`, PH `entry_size_follows_the_algorithm` | covered (SHA-384/512 not produced by the oracle: the attribute OIDs exist only for SHA-1 and SHA-256) |
+| OSSL-PH-2 | Page size = `SectionAlignment` (0x200, 0x300, 0x1000, 0x2000 observed; not necessarily a power of two) | osslsigncode `-ph` | PH `page_hash_tables_match_osslsigncode` (`ph_pe32_align200`, `ph_pe32_align300`, `ph_pe64_align2000`) | covered |
+| OSSL-PH-3 | First page = the headers (`SizeOfHeaders` bytes at file offset 0) without the CheckSum field and the Certificate Table entry (cut out, not zeroed), then zeros up to `SectionAlignment - SizeOfHeaders` bytes, i.e. the page is hashed as a zero-padded page with the excluded fields removed | osslsigncode `-ph` | PH `page_hash_tables_match_osslsigncode` (all, incl. `tiny32`, `tiny64`: 0x400 headers in a 0x1000 page) | covered |
+| OSSL-PH-4 | Each section with raw data starts on a new page, at its `PointerToRawData`, and is cut every page size; the last page of a section is hashed zero-padded to the page size; its table offset is the file offset of the page start | osslsigncode `-ph` | PH `page_hash_tables_match_osslsigncode` (`ph_pe32_multi`, `ph_pe64_multi`, `ph_pe64_align2000`, `ph_pe32_align300`) | covered |
+| OSSL-PH-5 | Sections are processed in section table order, **not** sorted by file offset (quirk: with raw data in reverse order the pages are not in ascending offset order and the last entry holds the end of the last section of the table). Sections with `SizeOfRawData` = 0 are skipped (also a last one with `PointerToRawData` = 0); the last entry's offset is the end of the last section that has raw data, 0 when none has | osslsigncode `-ph` | PH `page_hash_tables_match_osslsigncode` (`ph_pe32_reversed`, `ph_pe64_empty_*`, `ph_pe64_bss_last`, `ph_pe32_all_empty`) | covered |
+| OSSL-PH-6 | Data not in a section (overlay, certificate table) is not covered | osslsigncode `-ph` | PH `page_hash_tables_match_osslsigncode` (`ph_pe64_overlay`, `pe32_extra_3`) | covered |
+| OSSL-PH-7 | SHA-1 and SHA-256 tables of PE32 and PE32+ files | osslsigncode `-ph -h sha1|sha256` | PH `page_hash_tables_match_osslsigncode` | covered |
+| OSSL-PH-8 | A signed input file: page hashes of a file that already carries a certificate table | not observed | none | not covered: osslsigncode signs a clean file; by construction the certificate table is outside every section |
+| OSSL-PH-9 | The oracle refuses `SectionAlignment` = 0 ("Corrupted page size"), `SizeOfHeaders` > `SectionAlignment` ("Page size is smaller than header size") and a file with no section; we return `InvalidPageSize` / `NoSections` | osslsigncode `-ph` | PH `files_that_osslsigncode_refuses_are_an_error` | covered |
 
 ## Hash backend
 

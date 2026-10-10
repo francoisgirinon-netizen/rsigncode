@@ -6,9 +6,11 @@
 mod checksum;
 mod digest;
 mod error;
+mod page_hashes;
 mod parser;
 
 pub use checksum::checksum;
 pub use digest::{HashAlgorithm, authenticode_digest};
 pub use error::Error;
+pub use page_hashes::page_hashes;
 pub use parser::{PeFile, Section};
