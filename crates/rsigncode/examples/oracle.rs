@@ -53,8 +53,13 @@ fn main() {
             let name = path.file_stem().unwrap().to_string_lossy().into_owned();
             let data = std::fs::read(path).unwrap();
             let sum = checksum(&data);
-            let algorithms = [("sha1", HashAlgorithm::Sha1), ("sha256", HashAlgorithm::Sha256)]
-                .map(|(label, a)| {
+            let algorithms = [
+                ("sha1", HashAlgorithm::Sha1),
+                ("sha256", HashAlgorithm::Sha256),
+                ("sha384", HashAlgorithm::Sha384),
+                ("sha512", HashAlgorithm::Sha512),
+            ]
+            .map(|(label, a)| {
                     format!(
                         "\"{label}\": {{{}, {}}}",
                         member("digest", authenticode_digest(&data, a)),
