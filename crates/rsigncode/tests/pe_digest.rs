@@ -265,7 +265,7 @@ fn digest_lengths() {
 fn checksum_field_and_certificate_entry_are_not_hashed() {
     let a = fixture("pe32_aligned");
     let mut b = a.clone();
-    b[0xE8..0xEC].copy_from_slice(&[9, 9, 9, 9]); // CheckSum
+    b[0xD8..0xDC].copy_from_slice(&[9, 9, 9, 9]); // CheckSum
     assert_eq!(
         digest_hex(&a, HashAlgorithm::Sha256),
         digest_hex(&b, HashAlgorithm::Sha256)
