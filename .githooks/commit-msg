@@ -1,0 +1,13 @@
+#!/bin/sh
+# Require Conventional Commits (https://www.conventionalcommits.org/en/v1.0.0/).
+# Enable with: git config core.hooksPath .githooks
+subject=$(grep -v '^#' "$1" | head -n 1)
+pattern='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9._/-]+\))?!?: [^ ].*'
+case "$subject" in
+    Merge\ *|Revert\ *|fixup!\ *|squash!\ *) exit 0 ;;
+esac
+if ! printf '%s\n' "$subject" | grep -Eq "$pattern"; then
+    echo "commit-msg: the subject must follow Conventional Commits, e.g. 'feat(pe): add page hashes'" >&2
+    echo "  got: $subject" >&2
+    exit 1
+fi
