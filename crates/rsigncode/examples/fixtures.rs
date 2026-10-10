@@ -21,7 +21,10 @@ fn main() {
             f.set_len(total).unwrap();
         }
         [dir] => {
-            for (name, data) in common::fixtures() {
+            for (name, data) in common::fixtures()
+                .into_iter()
+                .chain(common::page_fixtures())
+            {
                 std::fs::write(format!("{dir}/{name}.exe"), data).unwrap();
             }
         }

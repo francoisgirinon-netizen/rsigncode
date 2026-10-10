@@ -19,6 +19,11 @@ pub enum Error {
     SectionOutOfBounds,
     /// The certificate table lies outside the file or overlaps the hashed data.
     InvalidCertificateTable,
+    /// `SectionAlignment` is zero, or `SizeOfHeaders` does not fit in one page of that size
+    /// (page hashes cannot be computed).
+    InvalidPageSize,
+    /// The section table is empty (page hashes cannot be computed).
+    NoSections,
     /// Placeholder while the feature is being developed.
     Unimplemented,
 }
@@ -34,6 +39,8 @@ impl fmt::Display for Error {
             Error::InvalidSizeOfHeaders => "invalid SizeOfHeaders",
             Error::SectionOutOfBounds => "section raw data outside of the file",
             Error::InvalidCertificateTable => "invalid certificate table",
+            Error::InvalidPageSize => "SectionAlignment is zero or smaller than SizeOfHeaders",
+            Error::NoSections => "no section",
             Error::Unimplemented => "not implemented",
         })
     }

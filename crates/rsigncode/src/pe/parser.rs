@@ -4,6 +4,7 @@ use core::ops::Range;
 const DOS_E_LFANEW: usize = 0x3c;
 const COFF_HEADER_SIZE: usize = 20;
 const SECTION_HEADER_SIZE: usize = 40;
+const OPT_SECTION_ALIGNMENT: usize = 32;
 const OPT_SIZE_OF_HEADERS: usize = 60;
 const OPT_CHECKSUM: usize = 64;
 const MAGIC_PE32: u16 = 0x10b;
@@ -36,6 +37,8 @@ pub struct PeFile<'a> {
     pub certificate_entry_offset: usize,
     /// `SizeOfHeaders`.
     pub size_of_headers: usize,
+    /// `SectionAlignment` (the page size of page hashes).
+    pub section_alignment: u32,
     /// Section table, in table order.
     pub sections: Vec<Section>,
     /// Certificate table (file offset and size), if the file is signed.
@@ -135,6 +138,7 @@ impl<'a> PeFile<'a> {
             checksum_offset,
             certificate_entry_offset,
             size_of_headers,
+            section_alignment: read_u32(data, opt + OPT_SECTION_ALIGNMENT)?,
             sections,
             certificate_table,
         })

@@ -16,6 +16,8 @@ pub struct PeBuilder {
     pub overlay: Vec<u8>,
     /// Value of the CheckSum field.
     pub checksum_field: u32,
+    /// Value of the SectionAlignment field.
+    pub section_alignment: u32,
 }
 
 impl PeBuilder {
@@ -26,7 +28,13 @@ impl PeBuilder {
             reverse_raw_order: false,
             overlay: Vec::new(),
             checksum_field: 0xDEAD_BEEF,
+            section_alignment: 0x1000,
         }
+    }
+
+    pub fn alignment(mut self, section_alignment: u32) -> Self {
+        self.section_alignment = section_alignment;
+        self
     }
 
     pub fn sections(mut self, sizes: &[usize]) -> Self {
@@ -88,7 +96,7 @@ impl PeBuilder {
         } else {
             put32(&mut h, p + img_base, 0x40_0000);
         }
-        put32(&mut h, p + 32, 0x1000); // SectionAlignment
+        put32(&mut h, p + 32, self.section_alignment); // SectionAlignment
         put32(&mut h, p + 36, FILE_ALIGNMENT as u32);
         put16(&mut h, p + 48, 6); // MajorSubsystemVersion
         put32(&mut h, p + 56, image_size as u32);
@@ -105,7 +113,7 @@ impl PeBuilder {
             let name = format!(".s{i}");
             h[s..s + name.len()].copy_from_slice(name.as_bytes());
             put32(&mut h, s + 8, *size as u32); // VirtualSize
-            put32(&mut h, s + 12, (0x1000 * (i + 1)) as u32);
+            put32(&mut h, s + 12, self.section_alignment * (i as u32 + 1));
             put32(&mut h, s + 16, *size as u32);
             put32(&mut h, s + 20, offsets[i] as u32);
             put32(&mut h, s + 36, 0x6000_0020);
@@ -204,4 +212,105 @@ pub fn fixtures() -> Vec<(&'static str, Vec<u8>)> {
         v.push((name, PeBuilder::new(true).overlay_len(extra).build()));
     }
     v
+}
+
+/// Fixtures for the page hash tests (multi-page sections, other section alignments, large
+/// headers, overlay, reversed and empty sections). The oracle data is produced by
+/// `tests/data/page_hashes.sh`.
+pub fn page_fixtures() -> Vec<(&'static str, Vec<u8>)> {
+    vec![
+        (
+            "ph_pe32_multi",
+            PeBuilder::new(false).sections(&[0x2400, 0x200]).build(),
+        ),
+        (
+            "ph_pe64_multi",
+            PeBuilder::new(true)
+                .sections(&[0x1000, 0x1800, 0x200])
+                .build(),
+        ),
+        (
+            "ph_pe32_align200",
+            PeBuilder::new(false)
+                .alignment(0x200)
+                .sections(&[0x600, 0x400])
+                .build(),
+        ),
+        (
+            "ph_pe64_align2000",
+            PeBuilder::new(true)
+                .alignment(0x2000)
+                .sections(&[0x2400, 0x2000])
+                .build(),
+        ),
+        (
+            "ph_pe32_many_sections",
+            PeBuilder::new(false).sections(&[0x200; 100]).build(),
+        ),
+        (
+            "ph_pe64_overlay",
+            PeBuilder::new(true)
+                .sections(&[0x1200])
+                .overlay_len(1000)
+                .build(),
+        ),
+        (
+            "ph_pe32_reversed",
+            PeBuilder::new(false)
+                .sections(&[0x1200, 0x400, 0x200])
+                .reversed()
+                .build(),
+        ),
+        (
+            "ph_pe32_no_sections",
+            PeBuilder::new(false).sections(&[]).build(),
+        ),
+        (
+            "ph_pe32_all_empty",
+            PeBuilder::new(false).sections(&[0, 0]).build(),
+        ),
+        (
+            "ph_pe32_align0",
+            PeBuilder::new(false)
+                .alignment(0)
+                .sections(&[0x400, 0x200])
+                .build(),
+        ),
+        (
+            "ph_pe32_align300",
+            PeBuilder::new(false)
+                .alignment(0x300)
+                .sections(&[0x600, 0x400])
+                .build(),
+        ),
+        (
+            "ph_pe32_align200_big_headers",
+            PeBuilder::new(false)
+                .alignment(0x200)
+                .sections(&[0x200; 20])
+                .build(),
+        ),
+        (
+            // Last section like a .bss: no raw data and PointerToRawData = 0.
+            "ph_pe64_bss_last",
+            {
+                let mut f = PeBuilder::new(true).sections(&[0x200, 0x400, 0]).build();
+                let raw_offset_of_last = DOS_SIZE + 24 + 240 + 40 * 2 + 20;
+                f[raw_offset_of_last..raw_offset_of_last + 4].fill(0);
+                f
+            },
+        ),
+        (
+            "ph_pe64_empty_first",
+            PeBuilder::new(true).sections(&[0, 0x200, 0x400]).build(),
+        ),
+        (
+            "ph_pe64_empty_last",
+            PeBuilder::new(true).sections(&[0x200, 0x400, 0]).build(),
+        ),
+        (
+            "ph_pe64_empty_section",
+            PeBuilder::new(true).sections(&[0x200, 0, 0x1200]).build(),
+        ),
+    ]
 }
