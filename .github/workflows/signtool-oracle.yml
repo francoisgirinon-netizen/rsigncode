@@ -1,0 +1,68 @@
+# Real Microsoft SignTool and imagehlp as a test oracle: the Authenticode digests, the page
+# hashes and the PE checksum of every PE fixture, compared with rsigncode. SignTool's raw
+# values are uploaded as an artifact; the committed copy is crates/rsigncode/tests/data/
+# signtool_oracle.json (see the README there).
+
+on:
+  push:
+    branches:
+      - test/signtool-oracle
+  pull_request:
+  workflow_dispatch:
+
+name: SignTool oracle
+
+jobs:
+  signtool-oracle:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Pure Rust hashing backend: no C compiler or NASM needed.
+      - name: Build the fixture generator and the oracle example
+        run: cargo build --release -p rsigncode --examples --no-default-features --features pure-rust
+
+      - name: Write the fixtures
+        run: |
+          New-Item -ItemType Directory -Force work/fixtures | Out-Null
+          target/release/examples/fixtures.exe work/fixtures
+          Copy-Item crates/rsigncode/tests/data/tiny32.efi, crates/rsigncode/tests/data/tiny64.efi work/fixtures
+          Get-ChildItem work/fixtures | Measure-Object | ForEach-Object { "$($_.Count) fixtures" }
+
+      - name: rsigncode values
+        run: target/release/examples/oracle.exe work/fixtures | Out-File -Encoding utf8 work/rsigncode.json
+
+      - name: SignTool and imagehlp values
+        run: ./ci/signtool_oracle.ps1 -Fixtures work/fixtures -Out work/signtool
+
+      - name: Extract the digests, page hashes and checksums
+        run: python ci/signtool_oracle.py extract work/signtool work/signtool_oracle.json
+
+      - name: Compare
+        env:
+          # Set to 'true' once the expected values are committed: a disagreement between
+          # SignTool and rsigncode then fails the job.
+          STRICT: 'false'
+        run: |
+          $strict = if ($env:STRICT -eq 'true') { '--strict' } else { '' }
+          python ci/signtool_oracle.py compare work/signtool_oracle.json work/rsigncode.json --committed crates/rsigncode/tests/data/signtool_oracle.json $strict | Out-File -Encoding utf8 work/summary.md
+          Get-Content work/summary.md | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+          Get-Content work/summary.md
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: signtool-oracle
+          path: |
+            work/signtool_oracle.json
+            work/signtool/raw.json
+            work/rsigncode.json
+            work/summary.md
+            work/signtool/dg/
+            work/signtool/signed/
