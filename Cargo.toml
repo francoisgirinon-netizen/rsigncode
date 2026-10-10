@@ -1,0 +1,11 @@
+[workspace]
+members = ["crates/rsigncode", "crates/rsigncode-cli"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+authors = ["Francois Girinon <francois.girinon@arturia.com>"]
+repository = "https://github.com/francoisgirinon-netizen/rsigncode"

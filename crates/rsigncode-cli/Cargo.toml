@@ -1,0 +1,17 @@
+[package]
+name = "rsigncode-cli"
+description = "Command line tool to sign and verify files with Authenticode"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "rsigncode"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+rsigncode = { path = "../rsigncode" }
