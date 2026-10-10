@@ -30,7 +30,7 @@ fn checksum_of_unsigned_file_matches_osslsigncode() {
 fn checksum_ignores_the_checksum_field() {
     let a = PeBuilder::new(false).build();
     let mut b = a.clone();
-    b[0xE8..0xEC].copy_from_slice(&[1, 2, 3, 4]);
+    b[0xD8..0xDC].copy_from_slice(&[1, 2, 3, 4]);
     assert_eq!(checksum(&a), checksum(&b));
     assert!(checksum(&a).is_ok());
 }
