@@ -1,7 +1,7 @@
 mod common;
 
 use common::{PeBuilder, fixtures};
-use rsigncode::pe::{Error, HashAlgorithm, authenticode_digest};
+use rsigncode::pe::{Error, HashAlgorithm, PeFile, authenticode_digest};
 
 fn hex(b: &[u8]) -> String {
     b.iter().map(|x| format!("{x:02x}")).collect()
@@ -131,6 +131,10 @@ const ALL_ALGORITHMS: &[(&str, &str, &str, &str, &str)] = &[
     ),
 ];
 
+/// Spec: AUTH-PE-1, AUTH-PE-2, AUTH-PE-3, AUTH-PE-4, AUTH-PE-5, AUTH-PE-7, AUTH-PE-9,
+/// AUTH-PE-10, AUTH-PE-11, AUTH-PE-12, AUTH-PE-13, AUTH-PE-14, AUTH-PE-15, PECOFF-3,
+/// PECOFF-4, PECOFF-5, PECOFF-6, PECOFF-7, SIGNTOOL-1. End to end on PE32 and PE32+,
+/// aligned or not, with overlay, with sections out of file order.
 #[test]
 fn sha256_of_every_fixture_matches_osslsigncode() {
     let all = fixtures();
@@ -145,6 +149,7 @@ fn sha256_of_every_fixture_matches_osslsigncode() {
     }
 }
 
+/// Spec: AUTH-PE-2, AUTH-PE-15 (SHA-1, SHA-256, SHA-384, SHA-512 contexts).
 #[test]
 fn all_four_algorithms_match_osslsigncode() {
     for (name, sha1, sha256, sha384, sha512) in ALL_ALGORITHMS {
@@ -165,6 +170,7 @@ fn all_four_algorithms_match_osslsigncode() {
 }
 
 // Oracle: osslsigncode extract-data on tests/data/tiny32.efi and tiny64.efi.
+/// Spec: AUTH-PE-1, AUTH-PE-15, PECOFF-4 (PE32 and PE32+ real images).
 #[test]
 fn tiny_efi_images_match_osslsigncode() {
     let cases = [
@@ -198,6 +204,7 @@ fn tiny_efi_images_match_osslsigncode() {
 // SHA-256: value from real SignTool 10.0.26100.0 (authenticode-rs test data). Without the
 // padding it would be 2a9e8c97f066e6eee3c5a3e22cdf158c4f7b457d0834a4ec8955942bc109bdac.
 // SHA-1: osslsigncode extract-data -h sha1.
+/// Spec: SIGNTOOL-1 (observed on SignTool, not in the Authenticode spec), AUTH-PE-14.
 #[test]
 fn unsigned_file_with_odd_size_is_padded_like_signtool() {
     let mut d = data("tiny64.efi");
@@ -216,6 +223,7 @@ fn unsigned_file_with_odd_size_is_padded_like_signtool() {
 // Signed with: osslsigncode sign -certs c.pem -key k.pem -h sha256 -time 1556668800
 // (throw-away self-signed key). Digest taken from `osslsigncode verify`
 // ("Current message digest" == "Calculated message digest"), equal to the unsigned digest.
+/// Spec: AUTH-PE-6, AUTH-PE-7, AUTH-PE-14, PECOFF-5, PECOFF-8, SIGNTOOL-1.
 #[test]
 fn files_signed_by_osslsigncode_have_the_digest_of_the_unsigned_file() {
     let cases = [
@@ -238,6 +246,8 @@ fn files_signed_by_osslsigncode_have_the_digest_of_the_unsigned_file() {
 }
 
 // tiny64.signed.efi was signed by SignTool: its digest must be the one of tiny64.efi.
+/// Spec: SIGNTOOL-2 (a file signed by SignTool is hashed up to its certificate table with
+/// no extra padding), AUTH-PE-6, AUTH-PE-7, AUTH-PE-14, PECOFF-5.
 #[test]
 fn file_signed_by_signtool_has_the_digest_of_the_unsigned_file() {
     for alg in [HashAlgorithm::Sha1, HashAlgorithm::Sha256] {
@@ -248,6 +258,7 @@ fn file_signed_by_signtool_has_the_digest_of_the_unsigned_file() {
     }
 }
 
+/// Spec: AUTH-PE-15 (finalised digest has the algorithm's length).
 #[test]
 fn digest_lengths() {
     let d = fixture("pe32_aligned");
@@ -261,8 +272,10 @@ fn digest_lengths() {
     }
 }
 
+/// Spec: AUTH-PE-3, AUTH-PE-4, PECOFF-3. The CheckSum field is skipped; the byte before it
+/// is hashed (see also `header_bytes_around_the_excluded_fields_are_hashed`).
 #[test]
-fn checksum_field_and_certificate_entry_are_not_hashed() {
+fn checksum_field_is_not_hashed() {
     let a = fixture("pe32_aligned");
     let mut b = a.clone();
     b[0xD8..0xDC].copy_from_slice(&[9, 9, 9, 9]); // CheckSum
@@ -278,6 +291,7 @@ fn checksum_field_and_certificate_entry_are_not_hashed() {
     );
 }
 
+/// Spec: ROBUST-1, ROBUST-2.
 #[test]
 fn every_truncation_inside_the_headers_or_sections_is_an_error() {
     for pe32plus in [false, true] {
@@ -293,6 +307,7 @@ fn every_truncation_inside_the_headers_or_sections_is_an_error() {
     }
 }
 
+/// Spec: PECOFF-1, PECOFF-2, ROBUST-2.
 #[test]
 fn bad_signatures_and_magic_are_reported() {
     let d = fixture("pe32_aligned");
@@ -322,6 +337,7 @@ fn bad_signatures_and_magic_are_reported() {
     );
 }
 
+/// Spec: AUTH-PE-11, PECOFF-7, ROBUST-2.
 #[test]
 fn section_beyond_the_end_of_the_file_is_an_error() {
     let mut d = fixture("pe32_aligned");
@@ -334,6 +350,7 @@ fn section_beyond_the_end_of_the_file_is_an_error() {
     );
 }
 
+/// Spec: AUTH-PE-6, PECOFF-5, ROBUST-2.
 #[test]
 fn certificate_table_outside_the_file_is_an_error() {
     let mut d = fixture("pe32_aligned");
@@ -346,6 +363,7 @@ fn certificate_table_outside_the_file_is_an_error() {
     );
 }
 
+/// Spec: PECOFF-4 (NumberOfRvaAndSizes), PECOFF-5, ROBUST-2.
 #[test]
 fn fewer_than_five_data_directories_is_an_error() {
     let mut d = fixture("pe32_aligned");
@@ -357,6 +375,115 @@ fn fewer_than_five_data_directories_is_an_error() {
     );
 }
 
+/// Spec: AUTH-PE-5, AUTH-PE-7. Every header byte except the CheckSum field and the
+/// Certificate Table entry is hashed: the byte just before and just after each excluded
+/// field, and the first byte of the section table, change the digest.
+#[test]
+fn header_bytes_around_the_excluded_fields_are_hashed() {
+    for pe32plus in [false, true] {
+        let d = PeBuilder::new(pe32plus).build();
+        let pe = PeFile::parse(&d).unwrap();
+        let base = digest_hex(&d, HashAlgorithm::Sha256);
+        let ce = pe.certificate_entry_offset;
+        let section_table = ce + 8 + 8 * 11; // 16 data directories, entry 4 is excluded
+        let positions = [
+            pe.checksum_offset - 8, // SizeOfImage (the byte just before is in SizeOfHeaders)
+            pe.checksum_offset + 4,
+            ce - 1,
+            ce + 8,
+            section_table,
+            pe.size_of_headers - 1,
+        ];
+        for at in positions {
+            let mut x = d.clone();
+            x[at] ^= 0xff;
+            assert_ne!(base, digest_hex(&x, HashAlgorithm::Sha256), "{at:#x}");
+        }
+    }
+}
+
+/// Spec: AUTH-PE-6, AUTH-PE-7, AUTH-PE-14. The Certificate Table entry and the table itself
+/// are not hashed: changing them (entry value, table content) leaves the digest unchanged.
+#[test]
+fn certificate_table_and_its_entry_are_not_hashed() {
+    let d = data("pe64_aligned.signed.exe");
+    let pe = PeFile::parse(&d).unwrap();
+    let table = pe.certificate_table.clone().unwrap();
+    let base = digest_hex(&d, HashAlgorithm::Sha256);
+    let mut x = d.clone();
+    x[table.end - 1] ^= 0xff;
+    x[table.start + 10] ^= 0xff;
+    assert_eq!(base, digest_hex(&x, HashAlgorithm::Sha256));
+    // A different size in the entry: still excluded, the table is just shorter.
+    let mut y = d.clone();
+    let size_at = pe.certificate_entry_offset + 4;
+    let size = u32::from_le_bytes(y[size_at..size_at + 4].try_into().unwrap());
+    y[size_at..size_at + 4].copy_from_slice(&(size - 8).to_le_bytes());
+    assert_eq!(base, digest_hex(&y, HashAlgorithm::Sha256));
+}
+
+/// Spec: AUTH-PE-9. Sections whose SizeOfRawData is zero are left out, whatever their
+/// PointerToRawData (even one pointing beyond the end of the file).
+#[test]
+fn sections_with_no_raw_data_are_ignored() {
+    let d = PeBuilder::new(true).sections(&[0x200, 0]).build();
+    let pe = PeFile::parse(&d).unwrap();
+    let section_table = pe.certificate_entry_offset + 8 + 8 * 11;
+    let mut x = d.clone();
+    let pointer_at = section_table + 40 + 20; // second section, PointerToRawData
+    x[pointer_at..pointer_at + 4].copy_from_slice(&0x7000_0000u32.to_le_bytes());
+    // The header bytes changed, so the digest differs, but it is computed without error and
+    // the zero-size section contributes no data.
+    assert!(authenticode_digest(&x, HashAlgorithm::Sha256).is_ok());
+    assert_eq!(
+        PeFile::parse(&x)
+            .unwrap()
+            .hashed_ranges()
+            .unwrap()
+            .ranges
+            .len(),
+        4
+    );
+}
+
+/// Spec: AUTH-PE-14. Bytes after the last section (overlay) are hashed, up to the end of
+/// the file (unsigned) and including the zero padding of an unaligned file.
+#[test]
+fn overlay_bytes_are_hashed() {
+    let d = PeBuilder::new(false).overlay_len(100).build();
+    let base = digest_hex(&d, HashAlgorithm::Sha256);
+    for at in [0x200, d.len() - 1] {
+        let mut x = d.clone();
+        x[at] ^= 1;
+        assert_ne!(base, digest_hex(&x, HashAlgorithm::Sha256), "{at:#x}");
+    }
+}
+
+/// Spec: AUTH-PE-8, AUTH-PE-12, AUTH-PE-13, AUTH-PE-14. The extra data starts at
+/// SUM_OF_BYTES_HASHED (SizeOfHeaders plus all SizeOfRawData) and ends at the end of the
+/// file (unsigned) or at the certificate table (signed).
+#[test]
+fn extra_data_range_follows_the_sum_of_bytes_hashed() {
+    let d = PeBuilder::new(true)
+        .sections(&[0x400, 0x200])
+        .overlay_len(20)
+        .build();
+    let pe = PeFile::parse(&d).unwrap();
+    let hashed = pe.hashed_ranges().unwrap();
+    assert_eq!(hashed.ranges.last().unwrap(), &(0x200 + 0x600..d.len()));
+    assert_eq!(hashed.padding, 4); // 0x800 + 20 = 2068, 2068 % 8 = 4
+    let signed = data("pe32_extra_3.signed.exe");
+    let pe = PeFile::parse(&signed).unwrap();
+    let hashed = pe.hashed_ranges().unwrap();
+    // Unsigned file was 0x400 + 3 bytes, padded to 0x408 before the certificate table.
+    assert_eq!(
+        hashed.ranges.last().unwrap(),
+        &(0x400..pe.certificate_table.unwrap().start)
+    );
+    assert_eq!(hashed.padding, 0);
+}
+
+/// Spec: ROBUST-1.
 #[test]
 fn random_corruption_never_panics() {
     let base = PeBuilder::new(true)
