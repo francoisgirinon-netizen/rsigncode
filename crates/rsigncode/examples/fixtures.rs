@@ -24,6 +24,7 @@ fn main() {
             for (name, data) in common::fixtures()
                 .into_iter()
                 .chain(common::page_fixtures())
+                .chain(common::signtool_fixtures())
             {
                 std::fs::write(format!("{dir}/{name}.exe"), data).unwrap();
             }

@@ -43,6 +43,11 @@ jobs:
       - name: Extract the digests, page hashes and checksums
         run: python ci/signtool_oracle.py extract work/signtool work/signtool_oracle.json
 
+      - name: rsigncode values on the files signed by SignTool
+        run: |
+          target/release/examples/oracle.exe work/signtool/signed/sha1 | Out-File -Encoding utf8 work/rsigncode_signed_sha1.json
+          target/release/examples/oracle.exe work/signtool/signed/sha256 | Out-File -Encoding utf8 work/rsigncode_signed_sha256.json
+
       - name: Compare
         env:
           # Set to 'true' once the expected values are committed: a disagreement between
@@ -50,7 +55,7 @@ jobs:
           STRICT: 'false'
         run: |
           $strict = if ($env:STRICT -eq 'true') { '--strict' } else { '' }
-          python ci/signtool_oracle.py compare work/signtool_oracle.json work/rsigncode.json --committed crates/rsigncode/tests/data/signtool_oracle.json $strict | Out-File -Encoding utf8 work/summary.md
+          python ci/signtool_oracle.py compare work/signtool_oracle.json work/rsigncode.json --committed crates/rsigncode/tests/data/signtool_oracle.json --signed sha1=work/rsigncode_signed_sha1.json --signed sha256=work/rsigncode_signed_sha256.json $strict | Out-File -Encoding utf8 work/summary.md
           Get-Content work/summary.md | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
           Get-Content work/summary.md
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

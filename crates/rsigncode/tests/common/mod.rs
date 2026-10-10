@@ -314,3 +314,61 @@ pub fn page_fixtures() -> Vec<(&'static str, Vec<u8>)> {
         ),
     ]
 }
+
+/// Fixtures added to probe what the real SignTool accepts and how it lays out page hashes
+/// (empty and unaligned sections, large headers, 64 KiB alignment, a short data directory
+/// table, reversed raw data with an empty section). The oracle data is produced by the
+/// `signtool-oracle` workflow (`tests/data/signtool_oracle.json`).
+pub fn signtool_fixtures() -> Vec<(&'static str, Vec<u8>)> {
+    vec![
+        (
+            "st_pe32_one_empty",
+            PeBuilder::new(false).sections(&[0]).build(),
+        ),
+        (
+            "st_pe32_empty_overlay",
+            PeBuilder::new(false)
+                .sections(&[0, 0])
+                .overlay_len(100)
+                .build(),
+        ),
+        (
+            "st_pe32_raw_unaligned",
+            PeBuilder::new(false).sections(&[0x300]).build(),
+        ),
+        (
+            "st_pe64_align10000",
+            PeBuilder::new(true)
+                .alignment(0x10000)
+                .sections(&[0x200, 0x1200])
+                .build(),
+        ),
+        (
+            "st_pe32_reversed_empty",
+            PeBuilder::new(false)
+                .sections(&[0x200, 0, 0x400, 0x200])
+                .reversed()
+                .build(),
+        ),
+        (
+            // SizeOfHeaders = 0x1000: the headers fill exactly one page.
+            "st_pe32_headers_4096",
+            PeBuilder::new(false).sections(&[0x200; 94]).build(),
+        ),
+        (
+            // SizeOfHeaders = 0x2000: the headers span two pages.
+            "st_pe32_headers_8192",
+            PeBuilder::new(false).sections(&[0x200; 190]).build(),
+        ),
+        (
+            // NumberOfRvaAndSizes = 4: no Certificate Table entry.
+            "st_pe32_four_directories",
+            {
+                let mut f = PeBuilder::new(false).sections(&[0x200]).build();
+                let at = DOS_SIZE + 24 + 92;
+                f[at..at + 4].copy_from_slice(&4u32.to_le_bytes());
+                f
+            },
+        ),
+    ]
+}

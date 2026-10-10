@@ -6,7 +6,8 @@
       and algorithm the file digest (from the .p7u of `/dg` and from the signed copy), the
       page hash table, the CheckSum field of the signed copy and the refusals.
 
-  signtool_oracle.py compare <oracle.json> <rsigncode.json> [--committed <oracle.json>] [--strict]
+  signtool_oracle.py compare <oracle.json> <rsigncode.json> [--committed <oracle.json>]
+                             [--signed sha1=<json>] [--signed sha256=<json>] [--strict]
       Markdown table on stdout; with --strict, exit status 1 on a disagreement between
       SignTool/imagehlp and rsigncode. With --committed, also reports (never fails) the
       values that differ from the committed oracle file.
@@ -233,8 +234,9 @@ def one_line(text):
     return " ".join((text or "").split()).replace("|", "/")
 
 
-def compare(oracle_path, rsigncode_path, committed_path, strict):
+def compare(oracle_path, rsigncode_path, committed_path, strict, signed_paths):
     oracle = json.loads(Path(oracle_path).read_text())
+    signed = {a: json.loads(Path(p).read_text()) for a, p in signed_paths.items()}
     ours = json.loads(Path(rsigncode_path).read_text())
     committed = None
     if committed_path and Path(committed_path).exists():
@@ -253,7 +255,7 @@ def compare(oracle_path, rsigncode_path, committed_path, strict):
         "",
         "| fixture | size | SHA-1 digest | SHA-256 digest | SHA-1 pages | SHA-256 pages | "
         "pages by offset | checksum (MapFileAndCheckSum) | checksum (CheckSumMappedFile) | "
-        "checksum field written by SignTool |",
+        "rsigncode on the file signed by SignTool (CheckSum field, digest) |",
         "|---|---|---|---|---|---|---|---|---|---|",
     ]
     refusals = []
@@ -310,8 +312,21 @@ def compare(oracle_path, rsigncode_path, committed_path, strict):
         cells.append(verdict("checksum (CheckSumMappedFile)", expected, rs["checksum"], rs["checksum_error"], "imagehlp"))
         # The value SignTool writes in the signed copy: the checksum of the signed file,
         # which is not the checksum of the unsigned one (not compared).
-        written = st["sha256"]["sign"].get("checksum_field")
-        cells.append("-" if written is None else str(written))
+        # rsigncode on the signed copies (`--signed alg=json`): same checksum and same digest.
+        signed_ok = []
+        for alg, table in signed.items():
+            sign = st[alg]["sign"]
+            copy = table.get(name)
+            if sign["exit"] != 0 or copy is None:
+                continue
+            for label, expected, got in (
+                ("checksum", sign["checksum_field"], copy["checksum"]),
+                ("digest", sign["digest"], copy[alg]["digest"]),
+            ):
+                if expected != got:
+                    failures.append(f"{name} {alg} signed copy {label}: SignTool {expected} != rsigncode {got}")
+                signed_ok.append(f"{alg} {label} {'ok' if expected == got else 'MISMATCH'}")
+        cells.append(", ".join(signed_ok) or "-")
         lines.append("| " + " | ".join(cells) + " |")
 
         if committed:
@@ -358,7 +373,10 @@ def main():
         extract(args[1], args[2])
     elif len(args) >= 3 and args[0] == "compare":
         committed = args[args.index("--committed") + 1] if "--committed" in args else None
-        compare(args[1], args[2], committed, "--strict" in args)
+        signed = dict(
+            args[i + 1].split("=", 1) for i, a in enumerate(args) if a == "--signed"
+        )
+        compare(args[1], args[2], committed, "--strict" in args, signed)
     else:
         sys.exit(__doc__)
 
