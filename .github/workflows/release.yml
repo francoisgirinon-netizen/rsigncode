@@ -1,0 +1,104 @@
+on:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+  workflow_dispatch:
+
+name: Release
+
+env:
+  RUSTFLAGS: -Dwarnings
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux binaries are static (musl): they run on any distribution and in scratch
+          # containers.
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            run: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-24.04-arm
+            run: true
+          # The MSVC runtime is linked statically (crt-static), no redistributable needed.
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            run: true
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            run: true
+          # Cross-compiled on the Apple Silicon runner, so it is not run.
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            run: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup target add ${{ matrix.target }}
+      - run: sudo apt-get update && sudo apt-get install -y musl-tools
+        if: contains(matrix.target, 'linux-musl')
+      # aws-lc-rs (default hashing backend) compiles assembly on Windows with NASM.
+      - uses: ilammy/setup-nasm@v1
+        if: runner.os == 'Windows'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Build
+        shell: bash
+        run: |
+          if [[ "${{ matrix.target }}" == *-windows-msvc ]]; then
+            export RUSTFLAGS="$RUSTFLAGS -C target-feature=+crt-static"
+          fi
+          # musl-tools installs musl-gcc, not the <arch>-linux-musl-gcc that cc-rs looks for.
+          if [[ "${{ matrix.target }}" == *-linux-musl ]]; then
+            target_env=$(echo "${{ matrix.target }}" | tr - _)
+            export "CC_$target_env=musl-gcc"
+          fi
+          cargo build --release --locked --target ${{ matrix.target }} -p rsigncode-cli
+      - name: Smoke test
+        if: matrix.run
+        shell: bash
+        run: target/${{ matrix.target }}/release/rsigncode --version
+      - name: Package
+        shell: bash
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "rsigncode-cli") | .version')
+          name=rsigncode-$version-${{ matrix.target }}
+          mkdir -p dist/$name
+          cp LICENSE-MIT LICENSE-APACHE README.md dist/$name/
+          if [[ "${{ matrix.target }}" == *-windows-* ]]; then
+            cp target/${{ matrix.target }}/release/rsigncode.exe dist/$name/
+            (cd dist && 7z a -tzip $name.zip $name > /dev/null)
+          else
+            cp target/${{ matrix.target }}/release/rsigncode dist/$name/
+            tar -C dist -czf dist/$name.tar.gz $name
+          fi
+          rm -r dist/$name
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rsigncode-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    # Only for version tags: a draft release, published by hand after review.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: cd dist && sha256sum * > SHA256SUMS
+      - run: gh release create "$GITHUB_REF_NAME" dist/* --draft --generate-notes --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}
