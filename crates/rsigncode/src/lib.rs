@@ -2,3 +2,5 @@
 //!
 //! The goal is feature parity with osslsigncode, written from the Microsoft
 //! specifications. See `ROADMAP.md` and `DESIGN.md` at the repository root.
+
+pub mod pe;

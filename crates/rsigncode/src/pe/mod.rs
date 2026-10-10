@@ -1,0 +1,14 @@
+//! PE32 and PE32+ files: parsing, Authenticode digest and image checksum.
+//!
+//! Everything works on a `&[u8]` (typically a memory map) and never panics on malformed
+//! input: problems are reported as [`Error`].
+
+mod checksum;
+mod digest;
+mod error;
+mod parser;
+
+pub use checksum::checksum;
+pub use digest::{HashAlgorithm, authenticode_digest};
+pub use error::Error;
+pub use parser::{PeFile, Section};
