@@ -7,8 +7,8 @@ Status: `[ ]` todo, `[~]` in progress, `[x]` done.
 
 ## v0.1: PE files and detached signing
 
-- [ ] PE/PE32+ parsing (headers, sections, certificate table), checksum
-- [ ] Authenticode digest (SHA-1, SHA-256, SHA-384, SHA-512), with the 8-byte padding of
+- [x] PE/PE32+ parsing (headers, sections, certificate table), checksum
+- [x] Authenticode digest (SHA-1, SHA-256, SHA-384, SHA-512), with the 8-byte padding of
       unsigned files that SignTool uses
 - [ ] Page hashes (`-ph`), SHA-1 and SHA-256
 - [ ] `SpcIndirectDataContent`, `SpcPeImageData`, `SpcSpOpusInfo` (`-n`, `-i`),
