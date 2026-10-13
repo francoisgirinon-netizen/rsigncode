@@ -47,3 +47,28 @@ impl fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+#[cfg(test)]
+mod tests {
+    use super::Error;
+
+    #[test]
+    fn every_error_has_its_own_message() {
+        let all = [
+            Error::Truncated,
+            Error::BadDosSignature,
+            Error::BadPeSignature,
+            Error::UnknownOptionalHeaderMagic,
+            Error::MissingCertificateDirectory,
+            Error::InvalidSizeOfHeaders,
+            Error::SectionOutOfBounds,
+            Error::InvalidCertificateTable,
+            Error::InvalidPageSize,
+            Error::NoSections,
+            Error::Unimplemented,
+        ];
+        let messages: std::collections::HashSet<_> = all.iter().map(Error::to_string).collect();
+        assert_eq!(messages.len(), all.len());
+        assert!(messages.iter().all(|m| !m.is_empty()));
+    }
+}
