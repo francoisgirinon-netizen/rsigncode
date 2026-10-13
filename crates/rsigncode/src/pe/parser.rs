@@ -56,15 +56,18 @@ pub struct HashedRanges {
 }
 
 fn read_u16(data: &[u8], at: usize) -> Result<u16, Error> {
-    let b = data.get(at..at.checked_add(2).ok_or(Error::Truncated)?);
-    b.map(|b| u16::from_le_bytes([b[0], b[1]]))
-        .ok_or(Error::Truncated)
+    let b = data.get(at..).and_then(|rest| rest.first_chunk::<2>());
+    b.map(|b| u16::from_le_bytes(*b)).ok_or(Error::Truncated)
 }
 
 fn read_u32(data: &[u8], at: usize) -> Result<u32, Error> {
-    let b = data.get(at..at.checked_add(4).ok_or(Error::Truncated)?);
-    b.map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
-        .ok_or(Error::Truncated)
+    let b = data.get(at..).and_then(|rest| rest.first_chunk::<4>());
+    b.map(|b| u32::from_le_bytes(*b)).ok_or(Error::Truncated)
+}
+
+/// Reads a field that `parse` has already checked to be inside the file.
+fn u32_at(data: &[u8], at: usize) -> u32 {
+    u32::from_le_bytes([data[at], data[at + 1], data[at + 2], data[at + 3]])
 }
 
 impl<'a> PeFile<'a> {
@@ -74,10 +77,11 @@ impl<'a> PeFile<'a> {
             return Err(Error::BadDosSignature);
         }
         let pe = read_u32(data, DOS_E_LFANEW)? as usize;
-        let coff = pe.checked_add(4).ok_or(Error::Truncated)?;
-        if data.get(pe..coff).ok_or(Error::Truncated)? != b"PE\0\0" {
+        let signature = data.get(pe..).and_then(|rest| rest.first_chunk::<4>());
+        if signature.ok_or(Error::Truncated)? != b"PE\0\0" {
             return Err(Error::BadPeSignature);
         }
+        let coff = pe + 4;
         let section_count = read_u16(data, coff + 2)? as usize;
         let opt_size = read_u16(data, coff + 16)? as usize;
         let opt = coff + COFF_HEADER_SIZE;
@@ -103,25 +107,22 @@ impl<'a> PeFile<'a> {
         }
 
         let table = opt + opt_size;
-        let table_end = section_count
-            .checked_mul(SECTION_HEADER_SIZE)
-            .and_then(|n| n.checked_add(table))
-            .ok_or(Error::Truncated)?;
+        let table_end = table.saturating_add(section_count * SECTION_HEADER_SIZE);
         if table_end > data.len() {
             return Err(Error::Truncated);
         }
         let sections = (0..section_count)
             .map(|i| {
                 let at = table + i * SECTION_HEADER_SIZE;
-                Ok(Section {
-                    raw_size: read_u32(data, at + 16)?,
-                    raw_offset: read_u32(data, at + 20)?,
-                })
+                Section {
+                    raw_size: u32_at(data, at + 16),
+                    raw_offset: u32_at(data, at + 20),
+                }
             })
-            .collect::<Result<Vec<_>, Error>>()?;
+            .collect();
 
-        let cert_offset = read_u32(data, certificate_entry_offset)? as usize;
-        let cert_size = read_u32(data, certificate_entry_offset + 4)? as usize;
+        let cert_offset = u32_at(data, certificate_entry_offset) as usize;
+        let cert_size = u32_at(data, certificate_entry_offset + 4) as usize;
         let certificate_table = if cert_size == 0 {
             None
         } else {
@@ -138,7 +139,7 @@ impl<'a> PeFile<'a> {
             checksum_offset,
             certificate_entry_offset,
             size_of_headers,
-            section_alignment: read_u32(data, opt + OPT_SECTION_ALIGNMENT)?,
+            section_alignment: u32_at(data, opt + OPT_SECTION_ALIGNMENT),
             sections,
             certificate_table,
         })

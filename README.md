@@ -36,7 +36,7 @@ Two hashing backends: aws-lc (default, needs a C compiler, NASM on Windows) and 
 with the real SignTool and imagehlp (`SignTool oracle`). Dependencies are checked for
 advisories, licenses and sources with cargo-deny (`Security`).
 
-At least 95 % of the lines must be covered by the tests (`coverage` job, `cargo llvm-cov`).
+All the lines must be covered by the tests (`coverage` job, `cargo llvm-cov`).
 
 The settings of the `main` branch are in [.github/rulesets/main.json](.github/rulesets/main.json):
 linear history, pull request with rebase merge only, and the CI checks above. GitHub needs a
