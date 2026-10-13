@@ -1,5 +1,8 @@
 use rsigncode::pe::{HashAlgorithm, authenticode_digest};
-use rsigncode::spc::{Error, PeImageFlags, indirect_data_content, pe_image_data};
+use rsigncode::spc::{
+    Error, PeImageFlags, StatementType, indirect_data_content, opus_info, opus_info_attribute,
+    pe_image_data, statement_type_attribute,
+};
 
 fn hex(b: &[u8]) -> String {
     b.iter().map(|x| format!("{x:02x}")).collect()
@@ -78,5 +81,77 @@ fn indirect_data_content_checks_the_digest_length() {
     assert_eq!(
         indirect_data_content(&[0x30, 0], HashAlgorithm::Sha256, &[0; 20]),
         Err(Error::DigestLength)
+    );
+}
+
+/// Spec: SPC-5
+/// The statement type attribute: the individual one is the attribute osslsigncode wrote in
+/// `pe32_extra_3.signed.exe`; the commercial one differs by the last OID arc (22).
+#[test]
+fn statement_type_attribute_matches_osslsigncode() {
+    assert_eq!(
+        hex(&statement_type_attribute(StatementType::Individual)),
+        "301c060a2b06010401823702010b310e300c060a2b060104018237020115"
+    );
+    assert_eq!(
+        hex(&statement_type_attribute(StatementType::Commercial)),
+        "301c060a2b06010401823702010b310e300c060a2b060104018237020116"
+    );
+}
+
+/// Spec: SPC-6
+/// `SpcSpOpusInfo`: `programName [0] { [0] BMPString }` (`-n`), `moreInfo [1] { [0] IA5String }`
+/// (`-i`), both optional. Layout of the structure, written from the definition used by
+/// osslsigncode (no real signature in `tests/data` carries one).
+#[test]
+fn opus_info_layout() {
+    assert_eq!(hex(&opus_info(None, None).unwrap()), "3000");
+    assert_eq!(
+        hex(&opus_info(Some("Test"), None).unwrap()),
+        "300ca00a80080054006500730074"
+    );
+    assert_eq!(
+        hex(&opus_info(None, Some("http://a")).unwrap()),
+        "300ca10a8008687474703a2f2f61"
+    );
+    assert_eq!(
+        hex(&opus_info(Some("Test"), Some("http://a")).unwrap()),
+        "3018a00a80080054006500730074a10a8008687474703a2f2f61"
+    );
+    // The attribute wraps the value in `SEQUENCE { 1.3.6.1.4.1.311.2.1.12, SET { value } }`.
+    assert_eq!(
+        hex(&opus_info_attribute(Some("Test"), Some("http://a")).unwrap()),
+        "3028060a2b06010401823702010c311a3018a00a80080054006500730074a10a8008687474703a2f2f61"
+    );
+}
+
+/// Spec: SPC-7
+/// Non-ASCII program names are UTF-16BE; a URL longer than 127 bytes uses the long length
+/// form.
+#[test]
+fn opus_info_encodings() {
+    assert_eq!(
+        hex(&opus_info(Some("é€"), None).unwrap()),
+        "3008a006800400e920ac"
+    );
+    // 207 bytes of URL: three nested long-form lengths (81 cf, 81 d2, 81 d5).
+    let url = format!("http://{}", "a".repeat(200));
+    let der = opus_info(None, Some(&url)).unwrap();
+    assert_eq!(hex(&der[..8]), "3081d5a181d28081");
+    assert_eq!(der.len(), 216);
+}
+
+/// Spec: SPC-8
+/// A program name outside the BMP or a non-ASCII URL cannot be encoded.
+#[test]
+fn opus_info_rejects_unencodable_text() {
+    assert_eq!(
+        opus_info(Some("a\u{1f600}"), None),
+        Err(Error::ProgramNameNotBmp)
+    );
+    assert_eq!(opus_info(None, Some("http://é")), Err(Error::UrlNotAscii));
+    assert_eq!(
+        opus_info_attribute(Some("\u{1f600}"), None),
+        Err(Error::ProgramNameNotBmp)
     );
 }
