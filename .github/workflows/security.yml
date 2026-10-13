@@ -1,0 +1,22 @@
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    # New advisories appear without any change in the repository.
+    - cron: "17 4 * * *"
+
+name: Security
+
+permissions:
+  contents: read
+
+jobs:
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories licenses bans sources
