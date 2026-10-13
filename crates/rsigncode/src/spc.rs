@@ -3,11 +3,53 @@
 //! The encodings are those of SignTool and osslsigncode, checked byte for byte against
 //! the signatures of the real files in `tests/data`.
 
+use crate::hash::HashAlgorithm;
+
 /// Why a structure could not be built.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Error {}
+pub enum Error {
+    /// The digest is not as long as the algorithm says.
+    DigestLength,
+}
+
+/// Encodes a `SpcIndirectDataContent`.
+pub fn indirect_data_content(
+    image_data: &[u8],
+    algorithm: HashAlgorithm,
+    digest: &[u8],
+) -> Result<Vec<u8>, Error> {
+    if digest.len() != algorithm.output_len() {
+        return Err(Error::DigestLength);
+    }
+    let mut data = tlv(TAG_OID, OID_SPC_PE_IMAGE_DATA);
+    data.extend_from_slice(image_data);
+    let mut content = tlv(TAG_SEQUENCE, &data);
+    content.extend_from_slice(&digest_info(algorithm, digest));
+    Ok(tlv(TAG_SEQUENCE, &content))
+}
+
+/// `DigestInfo { AlgorithmIdentifier { oid, NULL }, OCTET STRING }`.
+fn digest_info(algorithm: HashAlgorithm, digest: &[u8]) -> Vec<u8> {
+    let oid: &[u8] = match algorithm {
+        HashAlgorithm::Sha1 => &[0x2b, 0x0e, 0x03, 0x02, 0x1a],
+        HashAlgorithm::Sha256 => &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01],
+        HashAlgorithm::Sha384 => &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02],
+        HashAlgorithm::Sha512 => &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03],
+    };
+    let mut id = tlv(TAG_OID, oid);
+    id.extend_from_slice(&[TAG_NULL, 0]);
+    let mut info = tlv(TAG_SEQUENCE, &id);
+    info.extend_from_slice(&tlv(TAG_OCTET_STRING, digest));
+    tlv(TAG_SEQUENCE, &info)
+}
 
 const TAG_BIT_STRING: u8 = 0x03;
+const TAG_OCTET_STRING: u8 = 0x04;
+const TAG_NULL: u8 = 0x05;
+const TAG_OID: u8 = 0x06;
+
+/// 1.3.6.1.4.1.311.2.1.15, `SPC_PE_IMAGE_DATA_OBJID`.
+const OID_SPC_PE_IMAGE_DATA: &[u8] = &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x01, 0x0f];
 const TAG_SEQUENCE: u8 = 0x30;
 
 /// Appends the DER length of `len`.
