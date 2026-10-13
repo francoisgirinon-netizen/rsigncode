@@ -363,6 +363,35 @@ fn certificate_table_outside_the_file_is_an_error() {
     );
 }
 
+/// Spec: AUTH-PE-6, PECOFF-5, ROBUST-2 (a certificate table that starts inside the sections
+/// is not a table appended after the hashed data).
+#[test]
+fn certificate_table_overlapping_the_sections_is_an_error() {
+    let mut d = fixture("pe32_aligned");
+    let opt = 0x80 + 24;
+    let size_of_headers = u32::from_le_bytes(d[opt + 60..opt + 64].try_into().unwrap());
+    let entry = opt + 96 + 32;
+    d[entry..entry + 4].copy_from_slice(&size_of_headers.to_le_bytes());
+    d[entry + 4..entry + 8].copy_from_slice(&8u32.to_le_bytes());
+    assert_eq!(
+        authenticode_digest(&d, HashAlgorithm::Sha1),
+        Err(Error::InvalidCertificateTable)
+    );
+}
+
+/// Spec: PECOFF-3 (SizeOfHeaders), ROBUST-2: the headers must contain the Certificate
+/// Table entry.
+#[test]
+fn size_of_headers_smaller_than_the_headers_is_an_error() {
+    let mut d = fixture("pe32_aligned");
+    let opt = 0x80 + 24;
+    d[opt + 60..opt + 64].copy_from_slice(&0x100u32.to_le_bytes());
+    assert_eq!(
+        authenticode_digest(&d, HashAlgorithm::Sha1),
+        Err(Error::InvalidSizeOfHeaders)
+    );
+}
+
 /// Spec: PECOFF-4 (NumberOfRvaAndSizes), PECOFF-5, ROBUST-2.
 #[test]
 fn fewer_than_five_data_directories_is_an_error() {

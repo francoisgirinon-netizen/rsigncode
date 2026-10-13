@@ -70,9 +70,8 @@ pub fn digests(
             (*algorithm, plan, threads)
         });
 
-        let join = |t: thread::ScopedJoinHandle<'_, Vec<u8>>| {
-            t.join().unwrap_or_else(|e| std::panic::resume_unwind(e))
-        };
+        let join =
+            |t: thread::ScopedJoinHandle<'_, Vec<u8>>| t.join().expect("a hashing thread panicked");
         let file = file_threads.into_iter().map(join).collect();
         let page_hashes = page_threads.map(|(algorithm, plan, threads)| {
             let mut table: Vec<u8> = threads.into_iter().flat_map(join).collect();
