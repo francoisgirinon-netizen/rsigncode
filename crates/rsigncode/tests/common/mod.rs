@@ -353,7 +353,7 @@ pub fn signtool_fixtures() -> Vec<(&'static str, Vec<u8>)> {
         (
             // SizeOfHeaders = 0x1000: the headers fill exactly one page.
             "st_pe32_headers_4096",
-            PeBuilder::new(false).sections(&[0x200; 94]).build(),
+            PeBuilder::new(false).sections(&[0x200; 93]).build(),
         ),
         (
             // SizeOfHeaders = 0x2000: the headers span two pages.
