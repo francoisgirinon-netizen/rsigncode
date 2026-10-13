@@ -34,3 +34,17 @@ fn sum_words(bytes: &[u8], odd_start: bool) -> u64 {
     }
     sum
 }
+
+#[cfg(test)]
+mod tests {
+    use super::sum_words;
+
+    #[test]
+    fn words_starting_at_an_odd_offset_begin_with_a_high_byte() {
+        // The first byte is the high byte of a word, then [2, 3] is the word 0x0302.
+        assert_eq!(sum_words(&[1, 2, 3], true), 0x0100 + 0x0302);
+        assert_eq!(sum_words(&[], true), 0);
+        // Same bytes from an even offset: words 0x0201 and the trailing byte 3.
+        assert_eq!(sum_words(&[1, 2, 3], false), 0x0201 + 3);
+    }
+}

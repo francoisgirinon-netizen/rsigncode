@@ -116,3 +116,22 @@ impl Inner {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{HashAlgorithm, Hasher};
+
+    #[test]
+    fn output_len_is_the_length_of_the_digest() {
+        for algorithm in [
+            HashAlgorithm::Sha1,
+            HashAlgorithm::Sha256,
+            HashAlgorithm::Sha384,
+            HashAlgorithm::Sha512,
+        ] {
+            let mut hasher = Hasher::new(algorithm);
+            hasher.update(b"abc");
+            assert_eq!(hasher.finalize().len(), algorithm.output_len());
+        }
+    }
+}
