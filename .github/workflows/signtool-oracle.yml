@@ -12,6 +12,12 @@ on:
 
 name: SignTool oracle
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # A new push to a pull request cancels the run of the previous one; runs on main and
+  # scheduled runs always finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   signtool-oracle:
     runs-on: windows-latest
