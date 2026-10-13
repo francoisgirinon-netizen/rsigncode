@@ -1,0 +1,28 @@
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+name: Benchmarks
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  codspeed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install cargo-codspeed --locked
+      - run: cargo codspeed build -p rsigncode
+      - uses: CodSpeedHQ/action@v4
+        with:
+          mode: instrumentation
+          run: cargo codspeed run -p rsigncode
+          # A private repository needs the CODSPEED_TOKEN secret; a public one uses OIDC
+          # (id-token: write) and needs no secret.
+          token: ${{ secrets.CODSPEED_TOKEN }}
