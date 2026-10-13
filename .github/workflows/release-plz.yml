@@ -1,0 +1,35 @@
+on:
+  push:
+    branches: [main]
+
+name: Release PR
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-plz:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-plz
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      # Pushes made with the default GITHUB_TOKEN do not trigger other workflows, so the tag
+      # would not start release.yml. RELEASE_PLZ_TOKEN is a fine-grained PAT (contents and
+      # pull requests: write) or a GitHub App token.
+      - uses: release-plz/action@v0.5
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
+      - uses: release-plz/action@v0.5
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}

@@ -1,0 +1,22 @@
+[workspace]
+# Not published to crates.io for now: release-plz only versions, tags and writes the changelog.
+publish = false
+# Binaries and the GitHub release (a draft, with checksums) are built by release.yml when
+# the tag is pushed.
+git_release_enable = false
+# Conventional Commits drive the bump (feat: minor, fix: patch, ! or BREAKING CHANGE: major).
+# cargo-semver-checks is for published libraries; this one is not published.
+semver_check = false
+changelog_update = true
+pr_labels = ["release"]
+
+# One version for the whole workspace (version.workspace = true), tagged once as vX.Y.Z.
+[[package]]
+name = "rsigncode"
+changelog_update = false
+git_tag_enable = false
+
+[[package]]
+name = "rsigncode-cli"
+changelog_path = "CHANGELOG.md"
+git_tag_name = "v{{ version }}"
