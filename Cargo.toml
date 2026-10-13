@@ -16,6 +16,12 @@ lto = true
 codegen-units = 1
 strip = true
 
+# CodSpeed builds the benchmarks with this profile: without symbols its flamegraphs are
+# unreadable ("too much time spent in runtime internals").
+[profile.bench]
+strip = false
+debug = true
+
 [workspace.lints.rust]
 warnings = "deny"
 
