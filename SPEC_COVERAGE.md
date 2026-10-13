@@ -108,6 +108,24 @@ against real SignTool**, so the behaviours marked "quirk" (OSSL-PH-5) may differ
 | HASH-1 | SHA-1, SHA-256, SHA-384 and SHA-512 give the NIST FIPS 180-4 values ("abc", empty message, 448-bit message) whatever the backend (`aws-lc` or `pure-rust`) | NIST FIPS 180-4 examples, `openssl dgst` | `hash.rs` `nist_fips_180_vectors` | covered |
 | HASH-2 | A hasher is `Send` (can move to a worker thread) | project rule | `hash.rs` `hasher_is_send` | covered |
 
+## Authenticode structures (`spc.rs`)
+
+Sources: Microsoft Authenticode PE specification and the `SPC_*` definitions (`wintrust.h`, as laid out in osslsigncode's ASN.1 templates). The encodings of SPC-1..5 are compared byte for byte with those embedded in `tiny64.signed.efi` (SignTool) and `pe32_extra_3.signed.exe` (osslsigncode); the PKCS#7 was parsed with `openssl asn1parse`.
+
+| ID | Requirement | Source | Tests | Status |
+|---|---|---|---|---|
+| SPC-1 | `SpcPeImageData`: flags `BIT STRING` (none = `03 01 00`, `includeResources` = `03 02 07 80`) and `file` = `<<<Obsolete>>>` link (`[0] { [2] { [0] BMPString } }`) | Authenticode PE, real signatures | `spc.rs` `pe_image_data_matches_real_signatures` | covered |
+| SPC-2 | `SpcIndirectDataContent` (1.3.6.1.4.1.311.2.1.15 + image data, `DigestInfo`) equals the one in real signatures for the same digest | Authenticode PE, real signatures | `spc.rs` `indirect_data_content_matches_real_signatures` | covered |
+| SPC-3 | Digest algorithm identifiers SHA-1/256/384/512 with NULL parameters | RFC 3279 / RFC 8017 OIDs | `spc.rs` `indirect_data_content_algorithm_identifiers` | covered |
+| SPC-4 | A digest of the wrong length is refused | project rule | `spc.rs` `indirect_data_content_checks_the_digest_length` | covered |
+| SPC-5 | `SPC_STATEMENT_TYPE` attribute: individual (...2.1.21), commercial (...2.1.22) | real signature (individual), spec (commercial) | `spc.rs` `statement_type_attribute_matches_osslsigncode` | covered |
+| SPC-6 | `SpcSpOpusInfo` (`-n` BMPString `[0]`, `-i` IA5String link `[1]`, both optional) and its attribute (...2.1.12). **Not compared with a real file** (none of the files in `tests/data` has one) | osslsigncode templates | `spc.rs` `opus_info_layout` | covered |
+| SPC-7 | UTF-16BE program name; long length form | X.690 | `spc.rs` `opus_info_encodings` | covered |
+| SPC-8 | Characters outside the BMP and non-ASCII URLs are refused | project rule | `spc.rs` `opus_info_rejects_unencodable_text` | covered |
+| SPC-9 | `SpcPeImageData` with SHA-1 page hashes: moniker `SpcSerializedObject` (class id A6B586D5-...), `SET { SEQUENCE { 1.3.6.1.4.1.311.2.3.1, SET { OCTET STRING } } }`. **Not compared with a real file** (none has page hashes) | osslsigncode templates | `spc.rs` `pe_image_data_with_sha1_page_hashes_layout` | covered |
+| SPC-10 | SHA-256 page hashes use 1.3.6.1.4.1.311.2.3.2 | osslsigncode templates | `spc.rs` `pe_image_data_with_sha256_page_hashes_uses_v2` | covered |
+| SPC-11 | Page hashes only for SHA-1/SHA-256, table of whole entries | project rule | `spc.rs` `page_hash_arguments_are_checked` | covered |
+
 ## Summary
 
 | | covered | not covered | out of scope |
@@ -120,4 +138,5 @@ against real SignTool**, so the behaviours marked "quirk" (OSSL-PH-5) may differ
 | OSSL-PH-1..9 | 8 | 1 (OSSL-PH-8) | 0 |
 | PAR-1..4 | 4 | 0 | 0 |
 | HASH-1..2 | 2 | 0 | 0 |
-| **Total (47)** | **43** | **3** | **1** |
+| SPC-1..11 | 11 | 0 | 0 |
+| **Total (58)** | **54** | **3** | **1** |

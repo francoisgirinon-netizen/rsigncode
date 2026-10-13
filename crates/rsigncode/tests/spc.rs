@@ -1,7 +1,7 @@
-use rsigncode::pe::{HashAlgorithm, authenticode_digest};
+use rsigncode::pe::{HashAlgorithm, authenticode_digest, page_hashes};
 use rsigncode::spc::{
     Error, PeImageFlags, StatementType, indirect_data_content, opus_info, opus_info_attribute,
-    pe_image_data, statement_type_attribute,
+    pe_image_data, pe_image_data_with_page_hashes, statement_type_attribute,
 };
 
 fn hex(b: &[u8]) -> String {
@@ -82,6 +82,68 @@ fn indirect_data_content_checks_the_digest_length() {
         indirect_data_content(&[0x30, 0], HashAlgorithm::Sha256, &[0; 20]),
         Err(Error::DigestLength)
     );
+}
+
+/// Spec: SPC-9
+/// With page hashes, `file` is a moniker `SpcSerializedObject` (class id of
+/// `SpcPeImageData`) whose data is `SET { SEQUENCE { 1.3.6.1.4.1.311.2.3.1, SET { OCTET
+/// STRING table } } }` (V1, SHA-1). Layout written from osslsigncode's structures: no real
+/// signature in `tests/data` has page hashes, so this one is not checked against a file.
+#[test]
+fn pe_image_data_with_sha1_page_hashes_layout() {
+    let table = [
+        vec![0, 0, 0, 0],
+        vec![0x11; 20],
+        vec![0, 0, 0x10, 0],
+        vec![0; 20],
+    ]
+    .concat();
+    let der = pe_image_data_with_page_hashes(
+        PeImageFlags::INCLUDE_RESOURCES,
+        HashAlgorithm::Sha1,
+        &table,
+    )
+    .unwrap();
+    let expected = format!(
+        "3060 03020780 a05a a158 0410a6b586d5b4a12466ae05a217da8e60d6 0444 3142 3040 060a2b06010401823702030 1 3132 0430{}",
+        hex(&table)
+    )
+    .replace(' ', "");
+    assert_eq!(hex(&der), expected);
+}
+
+/// Spec: SPC-10
+/// SHA-256 page hashes use the V2 object identifier (1.3.6.1.4.1.311.2.3.2), the table is
+/// carried unchanged (here the table of a real image, 17 entries or fewer).
+#[test]
+fn pe_image_data_with_sha256_page_hashes_uses_v2() {
+    let data = data_file("tiny64.efi");
+    let table = page_hashes(&data, HashAlgorithm::Sha256).unwrap();
+    let der =
+        hex(
+            &pe_image_data_with_page_hashes(PeImageFlags::NONE, HashAlgorithm::Sha256, &table)
+                .unwrap(),
+        );
+    assert!(der.contains("060a2b06010401823702030231"));
+    assert!(der.ends_with(&hex(&table)));
+}
+
+/// Spec: SPC-11
+/// Page hashes exist for SHA-1 and SHA-256 only, and the table must be whole entries.
+#[test]
+fn page_hash_arguments_are_checked() {
+    for algorithm in [HashAlgorithm::Sha384, HashAlgorithm::Sha512] {
+        assert_eq!(
+            pe_image_data_with_page_hashes(PeImageFlags::NONE, algorithm, &[0; 52]),
+            Err(Error::PageHashAlgorithm)
+        );
+    }
+    for len in [0, 23, 25] {
+        assert_eq!(
+            pe_image_data_with_page_hashes(PeImageFlags::NONE, HashAlgorithm::Sha1, &vec![0; len]),
+            Err(Error::PageHashTable)
+        );
+    }
 }
 
 /// Spec: SPC-5

@@ -10,6 +10,10 @@ use crate::hash::HashAlgorithm;
 pub enum Error {
     /// The digest is not as long as the algorithm says.
     DigestLength,
+    /// Page hashes exist for SHA-1 and SHA-256 only.
+    PageHashAlgorithm,
+    /// The page hash table is empty or not a whole number of entries.
+    PageHashTable,
     /// The program name has a character outside the Basic Multilingual Plane.
     ProgramNameNotBmp,
     /// The URL is not ASCII (`IA5String`).
@@ -82,6 +86,34 @@ pub fn opus_info_attribute(
     ))
 }
 
+/// Encodes a `SpcPeImageData` carrying the page hash table.
+pub fn pe_image_data_with_page_hashes(
+    flags: PeImageFlags,
+    algorithm: HashAlgorithm,
+    table: &[u8],
+) -> Result<Vec<u8>, Error> {
+    let version = match algorithm {
+        HashAlgorithm::Sha1 => 0x01,
+        HashAlgorithm::Sha256 => 0x02,
+        HashAlgorithm::Sha384 | HashAlgorithm::Sha512 => return Err(Error::PageHashAlgorithm),
+    };
+    // Entries are a 4-byte offset and a hash; the table ends with its own entry.
+    if table.is_empty() || table.len() % (4 + algorithm.output_len()) != 0 {
+        return Err(Error::PageHashTable);
+    }
+    // SET { SEQUENCE { 1.3.6.1.4.1.311.2.3.<version>, SET { OCTET STRING table } } }
+    let mut oid = OID_SPC_PAGE_HASHES.to_vec();
+    oid.push(version);
+    let serialized = tlv(TAG_SET, &attribute(&oid, &tlv(TAG_OCTET_STRING, table)));
+    // SpcSerializedObject { classId, serializedData }, as the `moniker [1]` of the link.
+    let mut object = tlv(TAG_OCTET_STRING, &SPC_PE_IMAGE_DATA_CLASS_ID);
+    object.extend_from_slice(&tlv(TAG_OCTET_STRING, &serialized));
+    let link = tlv(0xa1, &object);
+    let mut content = flags.der();
+    content.extend_from_slice(&tlv(0xa0, &link));
+    Ok(tlv(TAG_SEQUENCE, &content))
+}
+
 /// Encodes a `SpcIndirectDataContent`.
 pub fn indirect_data_content(
     image_data: &[u8],
@@ -118,7 +150,13 @@ const TAG_OCTET_STRING: u8 = 0x04;
 const TAG_NULL: u8 = 0x05;
 const TAG_OID: u8 = 0x06;
 
-/// 1.3.6.1.4.1.311.2.1.15, `SPC_PE_IMAGE_DATA_OBJID`.
+/// 1.3.6.1.4.1.311.2.3, to which the version of the page hash table (1 or 2) is appended.
+const OID_SPC_PAGE_HASHES: &[u8] = &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x03];
+/// A6B586D5-B4A1-2466-AE05-A217DA8E60D6, the class id of `SpcPeImageData` objects.
+const SPC_PE_IMAGE_DATA_CLASS_ID: [u8; 16] = [
+    0xa6, 0xb5, 0x86, 0xd5, 0xb4, 0xa1, 0x24, 0x66, 0xae, 0x05, 0xa2, 0x17, 0xda, 0x8e, 0x60, 0xd6,
+];
+/// 1.3.6.1.4.1.311.2.1.15,`SPC_PE_IMAGE_DATA_OBJID`.
 const OID_SPC_PE_IMAGE_DATA: &[u8] = &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x01, 0x0f];
 const TAG_SEQUENCE: u8 = 0x30;
 const TAG_SET: u8 = 0x31;

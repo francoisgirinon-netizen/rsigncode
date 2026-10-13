@@ -12,7 +12,7 @@ Status: `[ ]` todo, `[~]` in progress, `[x]` done.
       unsigned files that SignTool uses
 - [x] Page hashes (`-ph`), SHA-1 and SHA-256, computed with the digest in one
       multi-threaded pass
-- [ ] `SpcIndirectDataContent`, `SpcPeImageData`, `SpcSpOpusInfo` (`-n`, `-i`),
+- [x] `SpcIndirectDataContent`, `SpcPeImageData`, `SpcSpOpusInfo` (`-n`, `-i`),
       statement type (`-comm`)
 - [ ] CMS `SignedData` with RSA (PKCS#1 v1.5) and ECDSA keys
 - [ ] Keys and certificates: PEM/DER files (`-certs`, `-key`), PKCS#12 (`-pkcs12`),
