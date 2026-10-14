@@ -1,5 +1,7 @@
 [workspace]
 # Not published to crates.io for now: release-plz only versions, tags and writes the changelog.
+# `publish = false` is set here and not in Cargo.toml: release-plz ignores the packages that
+# have it in Cargo.toml, so no release PR and no tag would ever be made.
 publish = false
 # Binaries and the GitHub release (a draft, with checksums) are built by release.yml when
 # the tag is pushed.

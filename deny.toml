@@ -19,7 +19,9 @@ confidence-threshold = 0.9
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
-# The workspace crates depend on each other by path, without a version.
+# The workspace crates depend on each other by path and version; release-plz keeps the
+# version in step. (Path dependencies without a version are only allowed in private crates,
+# and release-plz ignores crates marked `publish = false` in Cargo.toml.)
 allow-wildcard-paths = true
 
 [sources]
