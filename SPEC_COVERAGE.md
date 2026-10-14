@@ -128,7 +128,7 @@ Sources: Microsoft Authenticode PE specification and the `SPC_*` definitions (`w
 
 ## CMS `SignedData` (`cms.rs`)
 
-Sources: RFC 5652 and the Authenticode PE specification. The signatures are checked in Rust (CMS-4) and with `openssl smime -verify -noverify` (the PKCS#7 API, which accepts the Authenticode content that is not an `OCTET STRING`); the OpenSSL checks run only when the installed OpenSSL verifies the signature of SignTool (the control): OpenSSL 3.0, on Ubuntu 24.04, does not. **Not compared byte for byte with a real signature**: the signatures change with the key.
+Sources: RFC 5652 and the Authenticode PE specification. The signatures are checked in Rust (CMS-4) and with `openssl smime -verify -noverify` (the PKCS#7 API, which accepts the Authenticode content that is not an `OCTET STRING`); the OpenSSL checks run only when the installed OpenSSL verifies the signature of SignTool (the control). That needs OpenSSL 3.5: 3.0, 3.1 and 3.3 refuse SignTool's own signature. The `openssl` job of the CI installs a recent one with Homebrew and makes the checks mandatory (`RSIGNCODE_REQUIRE_OPENSSL`). **Not compared byte for byte with a real signature**: the signatures change with the key.
 
 | ID | Requirement | Source | Tests | Status |
 |---|---|---|---|---|
