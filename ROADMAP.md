@@ -14,7 +14,7 @@ Status: `[ ]` todo, `[~]` in progress, `[x]` done.
       multi-threaded pass
 - [x] `SpcIndirectDataContent`, `SpcPeImageData`, `SpcSpOpusInfo` (`-n`, `-i`),
       statement type (`-comm`)
-- [ ] CMS `SignedData` with RSA (PKCS#1 v1.5) and ECDSA keys
+- [x] CMS `SignedData` with RSA (PKCS#1 v1.5) and ECDSA (P-256, P-384) keys
 - [ ] Keys and certificates: PEM/DER files (`-certs`, `-key`), PKCS#12 (`-pkcs12`),
       passwords (`-pass`, `-readpass`, `-askpass`), additional certificates (`-ac`)
 - [ ] Keys in a HSM or token: PKCS#11 (`-pkcs11module`, `-pkcs11cert`, `-login`)

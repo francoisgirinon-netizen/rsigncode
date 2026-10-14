@@ -126,6 +126,16 @@ Sources: Microsoft Authenticode PE specification and the `SPC_*` definitions (`w
 | SPC-10 | SHA-256 page hashes use 1.3.6.1.4.1.311.2.3.2 | osslsigncode templates | `spc.rs` `pe_image_data_with_sha256_page_hashes_uses_v2` | covered |
 | SPC-11 | Page hashes only for SHA-1/SHA-256, table of whole entries | project rule | `spc.rs` `page_hash_arguments_are_checked` | covered |
 
+## CMS `SignedData` (`cms.rs`)
+
+Sources: RFC 5652 and the Authenticode PE specification. The signatures are checked with `openssl smime -verify -noverify` (the PKCS#7 API, which accepts the Authenticode content that is not an `OCTET STRING`); `tests/cms.rs` skips that check when openssl is not installed. **Not compared byte for byte with a real signature**: the signatures change with the key.
+
+| ID | Requirement | Source | Tests | Status |
+|---|---|---|---|---|
+| CMS-1 | The `SignedData` (content type, `messageDigest` of the content without tag and length, signed attributes as `[0]`, certificates, `SignerInfo`) verifies with OpenSSL for RSA 2048, ECDSA P-256 and P-384, with SHA-1, SHA-256, SHA-384 and SHA-512 | RFC 5652, Authenticode PE | `cms.rs` `signatures_verify_with_openssl` | covered |
+| CMS-2 | A changed signature does not verify | project rule | `cms.rs` `a_modified_signature_does_not_verify` | covered |
+| CMS-3 | No certificate, an invalid certificate, an unsupported key or an indirect data that is not a `SEQUENCE` are errors | project rule | `cms.rs` `bad_input_is_an_error` | covered |
+
 ## Summary
 
 | | covered | not covered | out of scope |
@@ -139,4 +149,5 @@ Sources: Microsoft Authenticode PE specification and the `SPC_*` definitions (`w
 | PAR-1..4 | 4 | 0 | 0 |
 | HASH-1..2 | 2 | 0 | 0 |
 | SPC-1..11 | 11 | 0 | 0 |
-| **Total (58)** | **54** | **3** | **1** |
+| CMS-1..3 | 3 | 0 | 0 |
+| **Total (61)** | **57** | **3** | **1** |

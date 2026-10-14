@@ -18,8 +18,14 @@ pure-rust = ["dep:sha1", "dep:sha2"]
 
 [dependencies]
 aws-lc-rs = { version = "1.18", optional = true }
+der = "0.8"
+p256 = { version = "0.14", default-features = false, features = ["ecdsa", "pkcs8", "std"] }
+p384 = { version = "0.14", default-features = false, features = ["ecdsa", "pkcs8", "std"] }
+pkcs8 = "0.11"
+rsa = { version = "0.10.0-rc.19", default-features = false, features = ["std", "encoding"] }
 sha1 = { version = "0.11.0", optional = true }
 sha2 = { version = "0.11.0", optional = true }
+x509-cert = "0.3"
 
 [dev-dependencies]
 codspeed-criterion-compat = "5.0.2"
