@@ -3,6 +3,13 @@
 [advisories]
 # Vulnerabilities and unmaintained or yanked crates fail the check.
 yanked = "deny"
+ignore = [
+    # Marvin attack on `rsa`: the private key leaks through the timing of many operations
+    # that an attacker can observe. No patched version exists (rsa 0.10 rc included).
+    # rsigncode signs offline and locally: nobody can time the signatures. Needed for RSA
+    # with SHA-1 (dual signing), which aws-lc-rs cannot sign. Revisit when `rsa` is fixed.
+    "RUSTSEC-2023-0071",
+]
 
 [licenses]
 allow = [
