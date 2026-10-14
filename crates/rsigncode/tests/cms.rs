@@ -65,10 +65,29 @@ fn openssl_verifies(signature: &[u8], name: &str) -> Option<bool> {
     Some(output.status.success())
 }
 
+/// Whether the installed OpenSSL can check Authenticode signatures at all: it must accept
+/// the one SignTool made. OpenSSL 3.0 (Ubuntu 24.04) refuses SignTool's own signatures with
+/// `PKCS7_verify: signature failure`, so with it the checks below say nothing about rsigncode.
+fn openssl_checks_authenticode() -> bool {
+    let signtool = data_file("signtool_sha256.p7");
+    match openssl_verifies(&signtool, "control") {
+        Some(true) => true,
+        Some(false) => {
+            eprintln!("this OpenSSL does not verify SignTool's signature: check skipped");
+            false
+        }
+        None => false,
+    }
+}
+
 /// Spec: CMS-1
-/// The signature of every key type and digest algorithm verifies with OpenSSL.
+/// The signature of every key type and digest algorithm verifies with OpenSSL (when this
+/// OpenSSL verifies the signature of SignTool, the control).
 #[test]
 fn signatures_verify_with_openssl() {
+    if !openssl_checks_authenticode() {
+        return;
+    }
     for key in ["rsa2048", "p256", "p384"] {
         for hash in ALGORITHMS {
             let signature = sign(key, hash);
@@ -84,13 +103,14 @@ fn signatures_verify_with_openssl() {
 /// A signature that was changed does not verify: the check above is not vacuous.
 #[test]
 fn a_modified_signature_does_not_verify() {
+    if !openssl_checks_authenticode() {
+        return;
+    }
     let mut signature = sign("p256", HashAlgorithm::Sha256);
     // The last bytes are the signature value.
     let last = signature.len() - 1;
     signature[last] ^= 1;
-    if let Some(ok) = openssl_verifies(&signature, "tampered") {
-        assert!(!ok);
-    }
+    assert_eq!(openssl_verifies(&signature, "tampered"), Some(false));
 }
 
 /// Spec: CMS-3
