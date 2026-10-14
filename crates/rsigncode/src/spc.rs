@@ -46,7 +46,7 @@ pub fn statement_type_attribute(statement: StatementType) -> Vec<u8> {
 }
 
 /// `SEQUENCE { oid, SET { value } }`, a CMS `Attribute` with one value.
-fn attribute(oid: &[u8], value: &[u8]) -> Vec<u8> {
+pub(crate) fn attribute(oid: &[u8], value: &[u8]) -> Vec<u8> {
     let mut content = tlv(TAG_OID, oid);
     content.extend_from_slice(&tlv(TAG_SET, value));
     tlv(TAG_SEQUENCE, &content)
@@ -131,7 +131,7 @@ pub fn indirect_data_content(
 }
 
 /// `DigestInfo { AlgorithmIdentifier { oid, NULL }, OCTET STRING }`.
-fn digest_info(algorithm: HashAlgorithm, digest: &[u8]) -> Vec<u8> {
+pub(crate) fn digest_info(algorithm: HashAlgorithm, digest: &[u8]) -> Vec<u8> {
     let oid: &[u8] = match algorithm {
         HashAlgorithm::Sha1 => &[0x2b, 0x0e, 0x03, 0x02, 0x1a],
         HashAlgorithm::Sha256 => &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01],
@@ -145,31 +145,35 @@ fn digest_info(algorithm: HashAlgorithm, digest: &[u8]) -> Vec<u8> {
     tlv(TAG_SEQUENCE, &info)
 }
 
-const TAG_BIT_STRING: u8 = 0x03;
-const TAG_OCTET_STRING: u8 = 0x04;
-const TAG_NULL: u8 = 0x05;
-const TAG_OID: u8 = 0x06;
+pub(crate) const TAG_BIT_STRING: u8 = 0x03;
+pub(crate) const TAG_OCTET_STRING: u8 = 0x04;
+pub(crate) const TAG_NULL: u8 = 0x05;
+pub(crate) const TAG_OID: u8 = 0x06;
 
 /// 1.3.6.1.4.1.311.2.3, to which the version of the page hash table (1 or 2) is appended.
-const OID_SPC_PAGE_HASHES: &[u8] = &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x03];
+pub(crate) const OID_SPC_PAGE_HASHES: &[u8] =
+    &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x03];
 /// A6B586D5-B4A1-2466-AE05-A217DA8E60D6, the class id of `SpcPeImageData` objects.
 const SPC_PE_IMAGE_DATA_CLASS_ID: [u8; 16] = [
     0xa6, 0xb5, 0x86, 0xd5, 0xb4, 0xa1, 0x24, 0x66, 0xae, 0x05, 0xa2, 0x17, 0xda, 0x8e, 0x60, 0xd6,
 ];
 /// 1.3.6.1.4.1.311.2.1.15,`SPC_PE_IMAGE_DATA_OBJID`.
-const OID_SPC_PE_IMAGE_DATA: &[u8] = &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x01, 0x0f];
-const TAG_SEQUENCE: u8 = 0x30;
-const TAG_SET: u8 = 0x31;
+pub(crate) const OID_SPC_PE_IMAGE_DATA: &[u8] =
+    &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x01, 0x0f];
+pub(crate) const TAG_SEQUENCE: u8 = 0x30;
+pub(crate) const TAG_SET: u8 = 0x31;
 
 /// 1.3.6.1.4.1.311.2.1, the arcs the `SPC_*` object identifiers share (without the last).
-const OID_SPC_MS_BASE: &[u8] = &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x01];
+pub(crate) const OID_SPC_MS_BASE: &[u8] = &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x01];
 /// 1.3.6.1.4.1.311.2.1.11, `SPC_STATEMENT_TYPE_OBJID`.
-const OID_SPC_STATEMENT_TYPE: &[u8] = &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x01, 0x0b];
+pub(crate) const OID_SPC_STATEMENT_TYPE: &[u8] =
+    &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x01, 0x0b];
 /// 1.3.6.1.4.1.311.2.1.12, `SPC_SP_OPUS_INFO_OBJID`.
-const OID_SPC_SP_OPUS_INFO: &[u8] = &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x01, 0x0c];
+pub(crate) const OID_SPC_SP_OPUS_INFO: &[u8] =
+    &[0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x01, 0x0c];
 
 /// Appends the DER length of `len`.
-fn push_len(out: &mut Vec<u8>, len: usize) {
+pub(crate) fn push_len(out: &mut Vec<u8>, len: usize) {
     if len < 0x80 {
         out.push(len as u8);
     } else {
@@ -181,7 +185,7 @@ fn push_len(out: &mut Vec<u8>, len: usize) {
 }
 
 /// `tag length content`.
-fn tlv(tag: u8, content: &[u8]) -> Vec<u8> {
+pub(crate) fn tlv(tag: u8, content: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(content.len() + 6);
     out.push(tag);
     push_len(&mut out, content.len());
