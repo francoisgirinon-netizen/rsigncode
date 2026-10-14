@@ -30,6 +30,21 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace
 
+  openssl:
+    # `openssl smime -verify` checks the signatures of rsigncode, and the one of SignTool as a
+    # control, but only from OpenSSL 3.5: the runners of Linux have 3.0, macOS has LibreSSL.
+    # Homebrew has a recent OpenSSL; the test fails, instead of skipping, if it is too old.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: Swatinem/rust-cache@v2
+      - run: brew install openssl@3
+      - name: Verify the signatures with OpenSSL
+        run: |
+          export OPENSSL="$(brew --prefix openssl@3)/bin/openssl"
+          "$OPENSSL" version
+          RSIGNCODE_REQUIRE_OPENSSL=1 cargo test -p rsigncode --test cms
+
   test-pure-rust:
     # Pure Rust hashing backend (RustCrypto), no C compiler needed.
     strategy:
