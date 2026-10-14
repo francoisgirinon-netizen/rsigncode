@@ -44,7 +44,7 @@ fn openssl_verifies(signature: &[u8], name: &str) -> Option<bool> {
     std::fs::create_dir_all(&dir).unwrap();
     let file = dir.join("sig.der");
     std::fs::write(&file, signature).unwrap();
-    let output = Command::new("openssl")
+    let output = Command::new(std::env::var("OPENSSL").unwrap_or_else(|_| "openssl".into()))
         .args([
             "smime",
             "-verify",
@@ -67,18 +67,22 @@ fn openssl_verifies(signature: &[u8], name: &str) -> Option<bool> {
 }
 
 /// Whether the installed OpenSSL can check Authenticode signatures at all: it must accept
-/// the one SignTool made. OpenSSL 3.0 (Ubuntu 24.04) refuses SignTool's own signatures with
-/// `PKCS7_verify: signature failure`, so with it the checks below say nothing about rsigncode.
+/// the one SignTool made. `openssl smime` refuses it before OpenSSL 3.5 (3.0, 3.1 and 3.3
+/// answer `PKCS7_verify: signature failure`, to SignTool's signature as to ours), so with
+/// those the checks below say nothing about rsigncode and are skipped, unless
+/// `RSIGNCODE_REQUIRE_OPENSSL` is set (the `openssl` job of the CI, which installs a recent
+/// one and points `OPENSSL` at it). `OPENSSL` is the command to run, `openssl` by default.
 fn openssl_checks_authenticode() -> bool {
     let signtool = data_file("signtool_sha256.p7");
-    match openssl_verifies(&signtool, "control") {
-        Some(true) => true,
-        Some(false) => {
-            eprintln!("this OpenSSL does not verify SignTool's signature: check skipped");
-            false
-        }
-        None => false,
+    let usable = openssl_verifies(&signtool, "control") == Some(true);
+    if !usable {
+        assert!(
+            std::env::var_os("RSIGNCODE_REQUIRE_OPENSSL").is_none(),
+            "RSIGNCODE_REQUIRE_OPENSSL is set but this OpenSSL does not verify SignTool's signature"
+        );
+        eprintln!("this OpenSSL does not verify SignTool's signature: check skipped");
     }
+    usable
 }
 
 /// Spec: CMS-1
