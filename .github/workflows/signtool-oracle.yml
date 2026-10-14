@@ -66,6 +66,17 @@ jobs:
           Get-Content work/summary.md
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # The CMS SignedData that rsigncode builds, checked by the Windows cryptographic API
+      # (SignedCms), with the signatures of SignTool as a control.
+      - name: Windows verifies the signatures of rsigncode
+        run: |
+          target/release/examples/cms.exe work/cms
+          ./ci/verify_cms.ps1 -Signatures work/cms -Reference crates/rsigncode/tests/data | Out-File -Encoding utf8 work/cms.md
+          $code = $LASTEXITCODE
+          Get-Content work/cms.md | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+          Get-Content work/cms.md
+          exit $code
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -75,5 +86,7 @@ jobs:
             work/signtool/raw.json
             work/rsigncode.json
             work/summary.md
+            work/cms.md
+            work/cms/
             work/signtool/dg/
             work/signtool/signed/

@@ -135,6 +135,8 @@ Sources: RFC 5652 and the Authenticode PE specification. The signatures are chec
 | CMS-1 | The `SignedData` (content type, `messageDigest` of the content without tag and length, signed attributes as `[0]`, certificates, `SignerInfo`) verifies with OpenSSL for RSA 2048, ECDSA P-256 and P-384, with SHA-1, SHA-256, SHA-384 and SHA-512 | RFC 5652, Authenticode PE | `cms.rs` `signatures_verify_with_openssl` | covered |
 | CMS-2 | A changed signature does not verify | project rule | `cms.rs` `a_modified_signature_does_not_verify` | covered |
 | CMS-3 | No certificate, an invalid certificate, an unsupported key or an indirect data that is not a `SEQUENCE` are errors | project rule | `cms.rs` `bad_input_is_an_error` | covered |
+| SIGNTOOL-CMS-1 | Given the `SpcIndirectDataContent` that SignTool signed, the `SignedData` equals SignTool's apart from certificate, signer identifier and signature value: version, digest algorithms, encapsulated content, signed attributes (empty `SpcSpOpusInfo`, content type, individual statement type, message digest; DER order; no signing time), `rsaEncryption` signature algorithm, signature length. SignTool 4.00, SHA-1/256/384/512 | real SignTool output (`signtool_<alg>.p7`) | `cms.rs` `signed_data_matches_signtool` | covered |
+| SIGNTOOL-CMS-2 | The Windows cryptographic API (`SignedCms.CheckSignature`) accepts the signatures of rsigncode for RSA 2048, P-256 and P-384 with SHA-1/256/384/512, accepts SignTool's own (control) and refuses a changed one. Runs in the `signtool-oracle` workflow only | Windows CryptoAPI | `ci/verify_cms.ps1`, `examples/cms.rs` | covered (CI) |
 
 ## Summary
 
@@ -150,4 +152,5 @@ Sources: RFC 5652 and the Authenticode PE specification. The signatures are chec
 | HASH-1..2 | 2 | 0 | 0 |
 | SPC-1..11 | 11 | 0 | 0 |
 | CMS-1..3 | 3 | 0 | 0 |
-| **Total (61)** | **57** | **3** | **1** |
+| SIGNTOOL-CMS-1..2 | 2 | 0 | 0 |
+| **Total (63)** | **59** | **3** | **1** |
