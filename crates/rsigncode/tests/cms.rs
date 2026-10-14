@@ -124,3 +124,118 @@ fn bad_input_is_an_error() {
         );
     }
 }
+
+/// The DER elements (tag, length and content) that follow one another in `der`.
+fn elements(mut der: &[u8]) -> Vec<&[u8]> {
+    let mut out = Vec::new();
+    while !der.is_empty() {
+        let (header, len) = match der[1] {
+            n if n < 0x80 => (2, usize::from(n)),
+            n => {
+                let count = usize::from(n & 0x7f);
+                let len = der[2..2 + count]
+                    .iter()
+                    .fold(0, |len, b| (len << 8) | usize::from(*b));
+                (2 + count, len)
+            }
+        };
+        out.push(&der[..header + len]);
+        der = &der[header + len..];
+    }
+    out
+}
+
+/// The elements inside a constructed DER element.
+fn children(element: &[u8]) -> Vec<&[u8]> {
+    let header = if element[1] < 0x80 {
+        2
+    } else {
+        2 + usize::from(element[1] & 0x7f)
+    };
+    elements(&element[header..])
+}
+
+/// The length of the content of a DER element.
+fn content_len(element: &[u8]) -> usize {
+    element.len()
+        - if element[1] < 0x80 {
+            2
+        } else {
+            2 + usize::from(element[1] & 0x7f)
+        }
+}
+
+/// What a `ContentInfo` of a PE signature holds, field by field.
+struct Parts<'a> {
+    version: &'a [u8],
+    digest_algorithms: &'a [u8],
+    encapsulated: &'a [u8],
+    certificates: usize,
+    signer_info_version: &'a [u8],
+    digest_algorithm: &'a [u8],
+    signed_attributes: &'a [u8],
+    signature_algorithm: &'a [u8],
+    signature_len: usize,
+}
+
+fn parts(content_info: &[u8]) -> Parts<'_> {
+    let signed_data = children(children(content_info)[1])[0];
+    let fields = children(signed_data);
+    let signer_info = children(children(fields[4])[0]);
+    Parts {
+        version: fields[0],
+        digest_algorithms: fields[1],
+        encapsulated: fields[2],
+        certificates: children(fields[3]).len(),
+        signer_info_version: signer_info[0],
+        digest_algorithm: signer_info[2],
+        signed_attributes: signer_info[3],
+        signature_algorithm: signer_info[4],
+        signature_len: content_len(signer_info[5]),
+    }
+}
+
+/// Spec: SIGNTOOL-CMS-1
+/// Fed with the `SpcIndirectDataContent` that SignTool signed (with `/ph`), the `SignedData`
+/// of rsigncode is, apart from the certificate, the signer identifier and the signature
+/// value (they depend on the key), the one SignTool writes: same version, digest
+/// algorithms, encapsulated content, signed attributes (the empty `SpcSpOpusInfo`, the
+/// content type, the individual statement type and the message digest, in DER order, no
+/// signing time), `rsaEncryption` signature algorithm and signature length.
+///
+/// `tests/data/signtool_<alg>.p7` are the signatures of `pe32_extra_3.exe` made by
+/// SignTool 4.00 (Windows SDK 10.0.26100) in the `signtool-oracle` workflow.
+#[test]
+fn signed_data_matches_signtool() {
+    for (name, hash) in [
+        ("sha1", HashAlgorithm::Sha1),
+        ("sha256", HashAlgorithm::Sha256),
+        ("sha384", HashAlgorithm::Sha384),
+        ("sha512", HashAlgorithm::Sha512),
+    ] {
+        let signtool_file = data_file(&format!("signtool_{name}.p7"));
+        let signtool = parts(&signtool_file);
+        // encapContentInfo { OID, [0] { SpcIndirectDataContent } }
+        let indirect = children(children(signtool.encapsulated)[1])[0];
+
+        let attributes = vec![
+            opus_info_attribute(None, None).unwrap(),
+            statement_type_attribute(StatementType::Individual),
+        ];
+        let ours_file = signed_data(&signer("rsa2048"), hash, indirect, &attributes).unwrap();
+        let ours = parts(&ours_file);
+
+        assert_eq!(ours.version, signtool.version, "{name} version");
+        assert_eq!(ours.digest_algorithms, signtool.digest_algorithms, "{name}");
+        assert_eq!(ours.encapsulated, signtool.encapsulated, "{name} content");
+        assert_eq!(ours.certificates, signtool.certificates, "{name}");
+        assert_eq!(ours.signer_info_version, signtool.signer_info_version);
+        assert_eq!(ours.digest_algorithm, signtool.digest_algorithm, "{name}");
+        assert_eq!(ours.signed_attributes, signtool.signed_attributes, "{name}");
+        assert_eq!(
+            ours.signature_algorithm, signtool.signature_algorithm,
+            "{name}"
+        );
+        assert_eq!(ours.signature_len, signtool.signature_len, "{name}");
+    }
+}
