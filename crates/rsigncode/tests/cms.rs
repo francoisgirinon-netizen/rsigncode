@@ -1,3 +1,4 @@
+use rsa::Pkcs1v15Sign;
 use rsigncode::cms::{Error, KeySigner, signed_data};
 use rsigncode::pe::HashAlgorithm;
 use rsigncode::spc::{
@@ -195,7 +196,7 @@ struct Parts<'a> {
     digest_algorithm: &'a [u8],
     signed_attributes: &'a [u8],
     signature_algorithm: &'a [u8],
-    signature_len: usize,
+    signature: &'a [u8],
 }
 
 fn parts(content_info: &[u8]) -> Parts<'_> {
@@ -211,7 +212,7 @@ fn parts(content_info: &[u8]) -> Parts<'_> {
         digest_algorithm: signer_info[2],
         signed_attributes: signer_info[3],
         signature_algorithm: signer_info[4],
-        signature_len: content_len(signer_info[5]),
+        signature: &signer_info[5][signer_info[5].len() - content_len(signer_info[5])..],
     }
 }
 
@@ -256,6 +257,85 @@ fn signed_data_matches_signtool() {
             ours.signature_algorithm, signtool.signature_algorithm,
             "{name}"
         );
-        assert_eq!(ours.signature_len, signtool.signature_len, "{name}");
+        assert_eq!(ours.signature.len(), signtool.signature.len(), "{name}");
+    }
+}
+
+/// The `DigestInfo` header that precedes the digest in a PKCS#1 v1.5 signature (RFC 8017).
+fn digest_info_prefix(hash: HashAlgorithm) -> Vec<u8> {
+    let (oid, len): (&[u8], u8) = match hash {
+        HashAlgorithm::Sha1 => (&[0x2b, 0x0e, 0x03, 0x02, 0x1a], 20),
+        HashAlgorithm::Sha256 => (&[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01], 32),
+        HashAlgorithm::Sha384 => (&[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02], 48),
+        HashAlgorithm::Sha512 => (&[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03], 64),
+    };
+    let mut algorithm = vec![0x06, oid.len() as u8];
+    algorithm.extend_from_slice(oid);
+    algorithm.extend_from_slice(&[0x05, 0x00]);
+    let mut prefix = vec![0x30, (algorithm.len() + 2 + 2 + usize::from(len)) as u8];
+    prefix.extend_from_slice(&[0x30, algorithm.len() as u8]);
+    prefix.extend_from_slice(&algorithm);
+    prefix.extend_from_slice(&[0x04, len]);
+    prefix
+}
+
+/// Spec: CMS-4
+/// Without OpenSSL: the signature value of every key type and digest algorithm is a valid
+/// signature, made with the key, of the hash of the signed attributes (as a `SET`). It is
+/// checked with the verifying side of the RSA and ECDSA crates, on the public key of the
+/// signer's key pair.
+#[test]
+fn signatures_verify_in_rust() {
+    use p256::ecdsa::signature::hazmat::PrehashVerifier;
+    use pkcs8::DecodePrivateKey;
+
+    for key in ["rsa2048", "p256", "p384"] {
+        let key_der = data_file(&format!("cms_{key}.key.der"));
+        for hash in ALGORITHMS {
+            let signature_file = sign(key, hash);
+            let signature = parts(&signature_file);
+            // The signature covers the attributes with the tag of a SET, not the [0] of
+            // the SignerInfo.
+            let mut signed_attributes = signature.signed_attributes.to_vec();
+            signed_attributes[0] = 0x31;
+            let mut hasher = rsigncode::hash::Hasher::new(hash);
+            hasher.update(&signed_attributes);
+            let digest = hasher.finalize();
+
+            match key {
+                "rsa2048" => {
+                    let public = rsa::RsaPublicKey::from(
+                        &rsa::RsaPrivateKey::from_pkcs8_der(&key_der).unwrap(),
+                    );
+                    let mut digest_info = digest_info_prefix(hash);
+                    digest_info.extend_from_slice(&digest);
+                    public
+                        .verify(
+                            Pkcs1v15Sign::new_unprefixed(),
+                            &digest_info,
+                            signature.signature,
+                        )
+                        .unwrap_or_else(|e| panic!("{key} {hash:?}: {e}"));
+                }
+                "p256" => {
+                    let public = *p256::ecdsa::SigningKey::from_pkcs8_der(&key_der)
+                        .unwrap()
+                        .verifying_key();
+                    let value = p256::ecdsa::Signature::from_der(signature.signature).unwrap();
+                    public
+                        .verify_prehash(&digest, &value)
+                        .unwrap_or_else(|e| panic!("{key} {hash:?}: {e}"));
+                }
+                _ => {
+                    let public = *p384::ecdsa::SigningKey::from_pkcs8_der(&key_der)
+                        .unwrap()
+                        .verifying_key();
+                    let value = p384::ecdsa::Signature::from_der(signature.signature).unwrap();
+                    public
+                        .verify_prehash(&digest, &value)
+                        .unwrap_or_else(|e| panic!("{key} {hash:?}: {e}"));
+                }
+            }
+        }
     }
 }
