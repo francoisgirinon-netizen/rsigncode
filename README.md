@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.png" alt="rsigncode logo" width="160"></p>
+
 # rsigncode
 
 [![CI](https://github.com/francoisgirinon-netizen/rsigncode/actions/workflows/ci.yml/badge.svg)](https://github.com/francoisgirinon-netizen/rsigncode/actions/workflows/ci.yml)
