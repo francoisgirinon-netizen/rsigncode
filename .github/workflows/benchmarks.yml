@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   codspeed:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # CodSpeed does not support Ubuntu 26.04 ("Unsupported system")
     steps:
       - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
@@ -27,7 +27,7 @@ jobs:
       - run: cargo codspeed build -p rsigncode
       - uses: CodSpeedHQ/action@v4
         with:
-          mode: instrumentation
+          mode: simulation
           run: cargo codspeed run -p rsigncode
           # A private repository needs the CODSPEED_TOKEN secret; a public one uses OIDC
           # (id-token: write) and needs no secret.
