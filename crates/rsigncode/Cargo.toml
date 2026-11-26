@@ -17,7 +17,8 @@ aws-lc = ["dep:aws-lc-rs"]
 pure-rust = ["dep:sha1", "dep:sha2"]
 
 [dependencies]
-aws-lc-rs = { version = "1.18", optional = true }
+# prebuilt-nasm: on Windows x64 without NASM, use the assembly objects shipped in aws-lc-sys.
+aws-lc-rs = { version = "1.18", optional = true, features = ["prebuilt-nasm"] }
 der = "0.8"
 p256 = { version = "0.14", default-features = false, features = ["ecdsa", "pkcs8", "std"] }
 p384 = { version = "0.14", default-features = false, features = ["ecdsa", "pkcs8", "std"] }
