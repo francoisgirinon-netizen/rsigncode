@@ -6,6 +6,7 @@ use rsigncode::spc::{
     statement_type_attribute,
 };
 use std::process::Command;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 fn data_file(name: &str) -> Vec<u8> {
     std::fs::read(format!("{}/tests/data/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap()
@@ -40,7 +41,14 @@ fn sign(key: &str, hash: HashAlgorithm) -> Vec<u8> {
 /// `openssl smime -verify` (the PKCS#7 API, which takes the Authenticode content as is) of the signature alone (`-noverify`: the certificates are
 /// self-signed and not trusted). `None` when openssl is not installed.
 fn openssl_verifies(signature: &[u8], name: &str) -> Option<bool> {
-    let dir = std::env::temp_dir().join(format!("rsigncode-cms-{}-{name}", std::process::id()));
+    // The tests run in parallel and several check the same control: one directory per call,
+    // or one test removes it while openssl still reads it in another.
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+    let call = CALLS.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!(
+        "rsigncode-cms-{}-{call}-{name}",
+        std::process::id()
+    ));
     std::fs::create_dir_all(&dir).unwrap();
     let file = dir.join("sig.der");
     std::fs::write(&file, signature).unwrap();
