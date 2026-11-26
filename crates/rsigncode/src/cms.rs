@@ -215,11 +215,8 @@ pub fn signed_data(
     let signer_certificate = parse(certificates.first().ok_or(Error::Certificate)?)?;
     let tbs = signer_certificate.tbs_certificate();
     let mut issuer_and_serial = tbs.issuer().to_der().map_err(|_| Error::Certificate)?;
-    issuer_and_serial.extend_from_slice(
-        &tbs.serial_number()
-            .to_der()
-            .map_err(|_| Error::Certificate)?,
-    );
+    let serial = tbs.serial_number();
+    issuer_and_serial.extend_from_slice(&serial.to_der().map_err(|_| Error::Certificate)?);
 
     // SignerInfo { version 1, sid, digestAlgorithm, [0] signedAttrs, signatureAlgorithm,
     // signature }
