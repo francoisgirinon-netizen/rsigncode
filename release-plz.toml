@@ -3,8 +3,8 @@
 # `publish = false` is set here and not in Cargo.toml: release-plz ignores the packages that
 # have it in Cargo.toml, so no release PR and no tag would ever be made.
 publish = false
-# Binaries and the GitHub release (a draft, with checksums) are built by release.yml when
-# the tag is pushed.
+# Binaries and the GitHub release (with checksums) are built by release.yml, which
+# release-plz.yml calls with the new tag.
 git_release_enable = false
 # Conventional Commits drive the bump (feat: minor, fix: patch, ! or BREAKING CHANGE: major).
 # cargo-semver-checks is for published libraries; this one is not published.

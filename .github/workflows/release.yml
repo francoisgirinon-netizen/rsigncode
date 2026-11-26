@@ -95,7 +95,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    # Only for version tags: a draft release, published by hand after review.
+    # Only for version tags.
     if: startsWith(github.ref, 'refs/tags/v') || inputs.tag
     needs: build
     runs-on: ubuntu-latest
@@ -107,7 +107,7 @@ jobs:
           path: dist
           merge-multiple: true
       - run: cd dist && sha256sum * > SHA256SUMS
-      - run: gh release create "$TAG" dist/* --draft --generate-notes --repo "$GITHUB_REPOSITORY"
+      - run: gh release create "$TAG" dist/* --generate-notes --repo "$GITHUB_REPOSITORY"
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag || github.ref_name }}
