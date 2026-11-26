@@ -98,7 +98,7 @@ pub fn pe_image_data_with_page_hashes(
         HashAlgorithm::Sha384 | HashAlgorithm::Sha512 => return Err(Error::PageHashAlgorithm),
     };
     // Entries are a 4-byte offset and a hash; the table ends with its own entry.
-    if table.is_empty() || table.len() % (4 + algorithm.output_len()) != 0 {
+    if table.is_empty() || !table.len().is_multiple_of(4 + algorithm.output_len()) {
         return Err(Error::PageHashTable);
     }
     // SET { SEQUENCE { 1.3.6.1.4.1.311.2.3.<version>, SET { OCTET STRING table } } }
