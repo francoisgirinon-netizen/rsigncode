@@ -1,11 +1,6 @@
 on:
   push:
     branches: [main]
-  # The release PR is opened with GITHUB_TOKEN: merging it from here does not start a push
-  # run, so this workflow merges it and releases in the same run once its checks pass.
-  workflow_run:
-    workflows: [CI, Security, Benchmarks, SignTool oracle]
-    types: [completed]
 
 name: Release PR
 
@@ -15,31 +10,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  merge-release-pr:
-    if: >-
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      startsWith(github.event.workflow_run.head_branch, 'release-plz-')
-    runs-on: ubuntu-latest
-    concurrency:
-      group: release-plz
-      cancel-in-progress: false
-    outputs:
-      merged: ${{ steps.merge.outputs.merged }}
-    steps:
-      # Fails while other required checks are still running; the last one to pass merges.
-      - id: merge
-        run: |
-          if gh pr merge "$BRANCH" --rebase --repo "$GITHUB_REPOSITORY"; then
-            echo merged=true >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          BRANCH: ${{ github.event.workflow_run.head_branch }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   release-plz:
-    needs: merge-release-pr
-    if: ${{ !cancelled() && (github.event_name == 'push' || needs.merge-release-pr.outputs.merged == 'true') }}
     runs-on: ubuntu-latest
     concurrency:
       group: release-plz
@@ -57,17 +28,33 @@ jobs:
           command: release-pr
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # A PR opened with GITHUB_TOKEN starts no workflow, so its required checks would never
-      # report: run them on the release branch.
-      - name: Run the checks on the release PR
+      # The release PR is opened with GITHUB_TOKEN: its pull_request runs wait for an approval,
+      # and merging it from here starts no push run. So this run approves them, waits for the
+      # required checks, merges, and releases below.
+      - name: Merge the release PR once its checks pass
         if: steps.release-pr.outputs.pr != '' && steps.release-pr.outputs.pr != '{}'
         run: |
-          branch=$(jq -r .head_branch <<<"$PR")
-          for workflow in ci.yml security.yml benchmarks.yml signtool-oracle.yml; do
-            gh workflow run "$workflow" --ref "$branch" --repo "$GITHUB_REPOSITORY"
+          number=$(jq -r .number <<<"$PR")
+          sha=$(gh pr view "$number" --json headRefOid -q .headRefOid)
+          for attempt in $(seq 30); do
+            runs=$(gh run list --commit "$sha" --event pull_request --json databaseId,conclusion,workflowName)
+            for id in $(jq -r '.[] | select(.conclusion == "action_required") | .databaseId' <<<"$runs"); do
+              gh api -X POST "repos/$GH_REPO/actions/runs/$id/approve"
+            done
+            [ "$(jq '[.[].workflowName] | unique | length' <<<"$runs")" -ge 4 ] && break
+            sleep 10
           done
+          # Right after the approval the checks may not be reported yet.
+          for attempt in $(seq 10); do
+            gh pr checks "$number" --required --watch --interval 30 && break
+            sleep 30
+          done
+          gh pr merge "$number" --rebase
+          git fetch origin main
+          git reset --hard origin/main
         env:
           PR: ${{ steps.release-pr.outputs.pr }}
+          GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: release-plz/action@v0.5
         id: release
