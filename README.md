@@ -3,7 +3,7 @@
 [![CI](https://github.com/francoisgirinon-netizen/rsigncode/actions/workflows/ci.yml/badge.svg)](https://github.com/francoisgirinon-netizen/rsigncode/actions/workflows/ci.yml)
 [![Security](https://github.com/francoisgirinon-netizen/rsigncode/actions/workflows/security.yml/badge.svg)](https://github.com/francoisgirinon-netizen/rsigncode/actions/workflows/security.yml)
 [![SignTool oracle](https://github.com/francoisgirinon-netizen/rsigncode/actions/workflows/signtool-oracle.yml/badge.svg)](https://github.com/francoisgirinon-netizen/rsigncode/actions/workflows/signtool-oracle.yml)
-[![MSRV](https://img.shields.io/badge/MSRV-1.85-blue.svg)](Cargo.toml)
+[![MSRV](https://img.shields.io/badge/MSRV-1.87-blue.svg)](Cargo.toml)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://www.conventionalcommits.org/en/v1.0.0/)
 
