@@ -70,6 +70,12 @@
           },
           {
             "context": "test-pure-rust (macos-latest)"
+          },
+          {
+            "context": "openssl"
+          },
+          {
+            "context": "signtool-oracle"
           }
         ]
       }
