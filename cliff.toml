@@ -1,0 +1,10 @@
+# Only used for the next version: `git cliff --bumped-version` in version.yml.
+[git]
+conventional_commits = true
+filter_unconventional = true
+tag_pattern = "v[0-9].*"
+
+[bump]
+features_always_bump_minor = true
+# 0.x: a breaking change bumps the minor version, not the major one.
+breaking_always_bump_major = false

@@ -47,10 +47,11 @@ linear history, pull request with rebase merge only, and the CI checks above (pl
 public repository (or a paid plan) to apply them, with
 `gh api -X POST repos/{owner}/{repo}/rulesets --input .github/rulesets/main.json`.
 
-Releases are automatic: on each push to `main`, release-plz opens a release PR from the
-Conventional Commits (version bump and changelog), merges it once its checks pass, tags
-`vX.Y.Z` and publishes the GitHub release with the binaries (static Linux musl, Windows,
-macOS) built by the `Release` workflow.
+Releases are automatic: on each push to `main` with a `feat`, `fix` or `perf` commit (or a
+breaking change) since the last tag, the `Version` workflow tags the next `vX.Y.Z` computed
+by git-cliff from the Conventional Commits, and the `Release` workflow publishes the GitHub
+release with the binaries (static Linux musl, Windows, macOS). The version is not committed:
+the release build takes it from the tag.
 
 ## Contributing
 
