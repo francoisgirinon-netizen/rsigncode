@@ -20,16 +20,30 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
-      # Pushes made with the default GITHUB_TOKEN do not trigger other workflows, so the tag
-      # would not start release.yml. RELEASE_PLZ_TOKEN is a fine-grained PAT (contents and
-      # pull requests: write) or a GitHub App token.
       - uses: release-plz/action@v0.5
         with:
           command: release-pr
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: release-plz/action@v0.5
+        id: release
         with:
           command: release
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - id: tag
+        run: echo "tag=$(jq -r '[.[] | select(.tag | startswith("v"))][0].tag // empty' <<<"$RELEASES")" >> "$GITHUB_OUTPUT"
+        env:
+          RELEASES: ${{ steps.release.outputs.releases }}
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+
+  # A tag pushed with GITHUB_TOKEN does not start release.yml on its own.
+  binaries:
+    needs: release-plz
+    if: needs.release-plz.outputs.tag != ''
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.release-plz.outputs.tag }}
