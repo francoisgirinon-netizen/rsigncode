@@ -35,21 +35,31 @@ jobs:
         if: steps.release-pr.outputs.pr != '' && steps.release-pr.outputs.pr != '{}'
         run: |
           number=$(jq -r .number <<<"$PR")
-          sha=$(gh pr view "$number" --json headRefOid -q .headRefOid)
-          for attempt in $(seq 30); do
-            runs=$(gh run list --commit "$sha" --event pull_request --json databaseId,conclusion,workflowName)
-            for id in $(jq -r '.[] | select(.conclusion == "action_required") | .databaseId' <<<"$runs"); do
-              gh api -X POST "repos/$GH_REPO/actions/runs/$id/approve"
+          branch=$(gh pr view "$number" --json headRefName -q .headRefName)
+          # The main ruleset only merges a branch that is up to date with main. Rebasing
+          # makes a new head whose runs wait for an approval again; main may also move
+          # while the checks run, hence the rounds.
+          for round in 1 2 3; do
+            if [ "$(gh api "repos/$GH_REPO/compare/main...$branch" --jq .behind_by)" != 0 ]; then
+              gh pr update-branch "$number" --rebase
+            fi
+            sha=$(gh pr view "$number" --json headRefOid -q .headRefOid)
+            for attempt in $(seq 30); do
+              runs=$(gh run list --commit "$sha" --event pull_request --json databaseId,conclusion,workflowName)
+              for id in $(jq -r '.[] | select(.conclusion == "action_required") | .databaseId' <<<"$runs"); do
+                gh api -X POST "repos/$GH_REPO/actions/runs/$id/approve"
+              done
+              [ "$(jq '[.[].workflowName] | unique | length' <<<"$runs")" -ge 4 ] && break
+              sleep 10
             done
-            [ "$(jq '[.[].workflowName] | unique | length' <<<"$runs")" -ge 4 ] && break
-            sleep 10
+            # Right after the approval the checks may not be reported yet.
+            for attempt in $(seq 10); do
+              gh pr checks "$number" --required --watch --interval 30 && break
+              sleep 30
+            done
+            gh pr merge "$number" --rebase && break
+            [ "$round" = 3 ] && exit 1
           done
-          # Right after the approval the checks may not be reported yet.
-          for attempt in $(seq 10); do
-            gh pr checks "$number" --required --watch --interval 30 && break
-            sleep 30
-          done
-          gh pr merge "$number" --rebase
           git fetch origin main
           git reset --hard origin/main
         env:
