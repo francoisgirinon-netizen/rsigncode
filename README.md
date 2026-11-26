@@ -1,6 +1,7 @@
 # rsigncode
 
 [![CI](https://github.com/francoisgirinon-netizen/rsigncode/actions/workflows/ci.yml/badge.svg)](https://github.com/francoisgirinon-netizen/rsigncode/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-100%25%20lines-brightgreen.svg)](https://github.com/francoisgirinon-netizen/rsigncode/actions/workflows/ci.yml)
 [![Security](https://github.com/francoisgirinon-netizen/rsigncode/actions/workflows/security.yml/badge.svg)](https://github.com/francoisgirinon-netizen/rsigncode/actions/workflows/security.yml)
 [![SignTool oracle](https://github.com/francoisgirinon-netizen/rsigncode/actions/workflows/signtool-oracle.yml/badge.svg)](https://github.com/francoisgirinon-netizen/rsigncode/actions/workflows/signtool-oracle.yml)
 [![MSRV](https://img.shields.io/badge/MSRV-1.87-blue.svg)](Cargo.toml)
@@ -39,12 +40,15 @@ advisories, licenses and sources with cargo-deny (`Security`).
 All the lines must be covered by the tests (`coverage` job, `cargo llvm-cov`).
 
 The settings of the `main` branch are in [.github/rulesets/main.json](.github/rulesets/main.json):
-linear history, pull request with rebase merge only, and the CI checks above. GitHub needs a
+linear history, pull request with rebase merge only, and the CI checks above (plus `openssl` and
+`signtool-oracle`). GitHub needs a
 public repository (or a paid plan) to apply them, with
 `gh api -X POST repos/{owner}/{repo}/rulesets --input .github/rulesets/main.json`.
 
-Release binaries (static Linux musl, Windows, macOS) are built by the `Release` workflow
-when a `vX.Y.Z` tag is pushed.
+Releases are automatic: on each push to `main`, release-plz opens a release PR from the
+Conventional Commits (version bump and changelog), merges it once its checks pass, tags
+`vX.Y.Z` and publishes the GitHub release with the binaries (static Linux musl, Windows,
+macOS) built by the `Release` workflow.
 
 ## Contributing
 
