@@ -6,6 +6,12 @@ on:
     paths:
       - .github/workflows/release.yml
   workflow_dispatch:
+  # Called by release-plz.yml: a tag pushed with GITHUB_TOKEN does not trigger the push event.
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
 
 name: Release
 
@@ -40,6 +46,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - run: rustup target add ${{ matrix.target }}
       - run: sudo apt-get update && sudo apt-get install -y musl-tools
         if: contains(matrix.target, 'linux-musl')
@@ -88,7 +96,7 @@ jobs:
 
   release:
     # Only for version tags: a draft release, published by hand after review.
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.tag
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -99,6 +107,7 @@ jobs:
           path: dist
           merge-multiple: true
       - run: cd dist && sha256sum * > SHA256SUMS
-      - run: gh release create "$GITHUB_REF_NAME" dist/* --draft --generate-notes --repo "$GITHUB_REPOSITORY"
+      - run: gh release create "$TAG" dist/* --draft --generate-notes --repo "$GITHUB_REPOSITORY"
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
